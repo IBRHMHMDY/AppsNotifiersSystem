@@ -4,37 +4,85 @@ declare(strict_types=1);
 
 namespace App\Filament\Widgets;
 
+use App\Enums\NotificationStatus;
 use App\Models\AppNotification;
 use App\Models\ClientApp;
 use App\Models\Device;
-use App\Enums\NotificationStatus;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class DashboardStats extends BaseWidget
 {
-    // ترتيب الويدجت ليظهر في أعلى الصفحة الرئيسية
     protected static ?int $sort = 1;
+
+    protected ?string $pollingInterval = '30s';
 
     protected function getStats(): array
     {
+        $totalApps = ClientApp::query()->count();
+        $activeApps = ClientApp::query()->where('is_active', true)->count();
+
+        $totalDevices = Device::query()->count();
+        $activeDevicesLast7Days = Device::query()
+            ->where('last_active_at', '>=', now()->subDays(7))
+            ->count();
+
+        $sentNotifications = AppNotification::query()
+            ->where('status', NotificationStatus::SENT)
+            ->count();
+        $failedNotifications = AppNotification::query()
+            ->where('status', NotificationStatus::FAILED)
+            ->count();
+        $pendingNotifications = AppNotification::query()
+            ->whereIn('status', [NotificationStatus::PENDING, NotificationStatus::PROCESSING])
+            ->count();
+
         return [
-            Stat::make('إجمالي التطبيقات', ClientApp::count())
-                ->description('التطبيقات المسجلة والفعالة')
+            Stat::make('إجمالي التطبيقات', (string) $totalApps)
+                ->description("منها {$activeApps} تطبيق نشط حالياً")
                 ->descriptionIcon('heroicon-m-device-phone-mobile')
                 ->color('primary')
-                ->chart([7, 2, 10, 3, 15, 4, 17]), // رسم بياني جمالي تقريبي
+                ->chart($this->getLastSevenDaysTrend(ClientApp::query())),
 
-            Stat::make('إجمالي الأجهزة', Device::count())
-                ->description('هواتف المستخدمين المرتبطة')
+            Stat::make('الأجهزة المسجلة', number_format($totalDevices))
+                ->description("{$activeDevicesLast7Days} جهاز نشط خلال آخر 7 أيام")
                 ->descriptionIcon('heroicon-m-users')
                 ->color('success')
-                ->chart([3, 12, 5, 20, 10, 25, 30]),
+                ->chart($this->getLastSevenDaysTrend(Device::query())),
 
-            Stat::make('الإشعارات الناجحة', AppNotification::where('status', NotificationStatus::SENT)->count())
-                ->description('تم إرسالها بنجاح')
+            Stat::make('الإشعارات المرسلة', number_format($sentNotifications))
+                ->description("معلق: {$pendingNotifications} | فاشل: {$failedNotifications}")
                 ->descriptionIcon('heroicon-m-paper-airplane')
-                ->color('info'),
+                ->color($failedNotifications > 0 ? 'warning' : 'info')
+                ->chart($this->getLastSevenDaysTrend(
+                    AppNotification::query()->where('status', NotificationStatus::SENT),
+                    'sent_at'
+                )),
         ];
+    }
+
+    /**
+     * حساب عدد السجلات اليومية لآخر 7 أيام لرسم المخطط المصغر (Sparkline) بشكل حقيقي.
+     *
+     * @return array<int, int>
+     */
+    private function getLastSevenDaysTrend(Builder $query, string $dateColumn = 'created_at'): array
+    {
+        $startDate = Carbon::today()->subDays(6)->startOfDay();
+
+        $records = (clone $query)
+            ->where($dateColumn, '>=', $startDate)
+            ->get([$dateColumn])
+            ->groupBy(fn ($model): string => Carbon::parse($model->{$dateColumn})->format('Y-m-d'));
+
+        $trend = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $dateKey = Carbon::today()->subDays($i)->format('Y-m-d');
+            $trend[] = isset($records[$dateKey]) ? $records[$dateKey]->count() : 0;
+        }
+
+        return $trend;
     }
 }
