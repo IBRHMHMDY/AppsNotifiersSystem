@@ -5,36 +5,33 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\CheckUpdateRequest;
+use App\Http\Resources\Api\AppUpdateResource;
+use App\Models\AppUpdate;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class CheckUpdateController extends Controller
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(CheckUpdateRequest $request): JsonResponse
     {
-        // جلب التطبيق المحقون من الـ Middleware
-        $clientApp = $request->attributes->get('clientApp');
-        
-        // جلب أحدث تحديث تم تسجيله لهذا التطبيق
-        $latestUpdate = $clientApp->updates()->latest('created_at')->first();
+        $dto = $request->toDto();
+
+        /** @var AppUpdate|null $latestUpdate */
+        $latestUpdate = $request->clientApp()
+            ->updates()
+            ->latest('created_at')
+            ->first();
 
         if (! $latestUpdate) {
-            return response()->json([
-                'success' => true,
-                'message' => 'No updates available.',
-                'data' => null
-            ]);
+            return $this->successResponse(
+                data: null,
+                message: 'No updates available.'
+            );
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Latest update fetched successfully.',
-            'data' => [
-                'version' => $latestUpdate->version,
-                'store_url' => $latestUpdate->store_url,
-                'is_force_update' => $latestUpdate->is_force_update,
-                'release_notes' => $latestUpdate->release_notes,
-            ]
-        ]);
+        return $this->successResponse(
+            data: new AppUpdateResource($latestUpdate, $dto->currentVersion),
+            message: 'Latest update fetched successfully.'
+        );
     }
 }

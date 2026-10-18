@@ -4,51 +4,144 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Contracts\PushNotificationServiceInterface;
+use App\DTOs\PushDeliveryResultDTO;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Contract\Messaging;
+use Kreait\Firebase\Exception\MessagingException;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
+use Throwable;
 
-class FirebasePushService
+class FirebasePushService implements PushNotificationServiceInterface
 {
     public function __construct(
         private readonly Messaging $messaging
     ) {}
 
     /**
-     * إرسال الإشعار لعدة أجهزة (FCM Tokens) دفعة واحدة.
-     *
-     * @param array<string> $tokens
-     * @param string $title
-     * @param string $body
-     * @param string|null $imageUrl
-     * @return array<string, mixed>
+     * {@inheritDoc}
      */
-    public function sendMulticast(array $tokens, string $title, string $body, ?string $imageUrl = null): array
-    {
-        if (empty($tokens)) {
-            return ['success' => 0, 'failure' => 0];
+    public function sendToToken(
+        string $token,
+        string $title,
+        string $body,
+        array $data = [],
+        ?string $imageUrl = null
+    ): PushDeliveryResultDTO {
+        return $this->sendMulticast([$token], $title, $body, $data, $imageUrl);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function sendMulticast(
+        array $tokens,
+        string $title,
+        string $body,
+        array $data = [],
+        ?string $imageUrl = null
+    ): PushDeliveryResultDTO {
+        $validTokens = array_values(array_filter(array_unique($tokens)));
+
+        if ($validTokens === []) {
+            return new PushDeliveryResultDTO();
         }
-
-        $notification = Notification::create($title, $body, $imageUrl);
-
-        // إضافة صورة للإشعار إن وجدت
-        $message = CloudMessage::new()->withNotification($notification);
 
         try {
-            // إرسال الإشعار كدفعة واحدة (Multicast) لأقصى كفاءة
-            $report = $this->messaging->sendMulticast($message, $tokens);
+            $notification = Notification::create($title, $body, $imageUrl);
 
-            // يمكنك هنا معالجة الـ Tokens غير الصالحة (التي قام أصحابها بحذف التطبيق)
-            // $invalidTokens = $report->unknownTokens();
-            
-            return [
-                'success' => $report->successes()->count(),
-                'failure' => $report->failures()->count(),
-            ];
-        } catch (\Throwable $e) {
-            Log::error('Firebase Push Failed: ' . $e->getMessage());
-            throw $e;
+            $message = CloudMessage::new()
+                ->withNotification($notification)
+                ->withData($this->sanitizePayloadData($data));
+
+            $report = $this->messaging->sendMulticast($message, $validTokens);
+
+            // استخراج التوكنات غير الصالحة أو المحذوفة لتنظيف قاعدة البيانات
+            $invalidTokens = array_values(array_unique(array_merge(
+                $report->unknownTokens(),
+                $report->invalidTokens()
+            )));
+
+            $errors = [];
+            if ($report->hasFailures()) {
+                foreach ($report->failures()->getItems() as $failure) {
+                    $errors[] = $failure->error()?->getMessage() ?? 'Unknown FCM multicast error';
+                }
+            }
+
+            return new PushDeliveryResultDTO(
+                successCount: $report->successes()->count(),
+                failureCount: $report->failures()->count(),
+                invalidTokens: $invalidTokens,
+                errors: array_slice(array_unique($errors), 0, 10),
+            );
+        } catch (MessagingException|Throwable $e) {
+            Log::error('Firebase Multicast Push Error: '.$e->getMessage(), [
+                'tokens_count' => count($validTokens),
+                'exception' => $e,
+            ]);
+
+            return new PushDeliveryResultDTO(
+                successCount: 0,
+                failureCount: count($validTokens),
+                invalidTokens: [],
+                errors: [$e->getMessage()],
+            );
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function sendToTopic(
+        string $topic,
+        string $title,
+        string $body,
+        array $data = [],
+        ?string $imageUrl = null
+    ): PushDeliveryResultDTO {
+        try {
+            $notification = Notification::create($title, $body, $imageUrl);
+
+            $message = CloudMessage::new()
+                ->withTopic($topic)
+                ->withNotification($notification)
+                ->withData($this->sanitizePayloadData($data));
+
+            $this->messaging->send($message);
+
+            return new PushDeliveryResultDTO(successCount: 1, failureCount: 0);
+        } catch (MessagingException|Throwable $e) {
+            Log::error('Firebase Topic Push Error: '.$e->getMessage(), [
+                'topic' => $topic,
+                'exception' => $e,
+            ]);
+
+            return new PushDeliveryResultDTO(
+                successCount: 0,
+                failureCount: 1,
+                errors: [$e->getMessage()],
+            );
+        }
+    }
+
+    /**
+     * ضمان تحويل جميع قيم مصفوفة البيانات الإضافية إلى نصوص (Strings) كما يشترط FCM v1 API.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, string>
+     */
+    private function sanitizePayloadData(array $data): array
+    {
+        $sanitized = [];
+
+        foreach ($data as $key => $value) {
+            $sanitized[(string) $key] = is_scalar($value)
+                ? (string) $value
+                : (json_encode($value) ?: '');
+        }
+
+        return $sanitized;
     }
 }

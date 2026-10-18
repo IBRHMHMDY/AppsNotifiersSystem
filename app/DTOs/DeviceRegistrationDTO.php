@@ -12,6 +12,7 @@ readonly class DeviceRegistrationDTO
         public string $appKey, // مفتاح التطبيق القادم من Flutter
         public string $fcmToken,
         public OsType $osType,
-        public string $appVersion
+        public string $appVersion,
+        public ?int $clientAppId = null,
     ) {}
 }

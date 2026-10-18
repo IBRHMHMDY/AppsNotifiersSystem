@@ -50,9 +50,22 @@ return [
              *
              */
 
-            'credentials' => env('FIREBASE_CREDENTIALS') 
-                ? storage_path('app/' . env('FIREBASE_CREDENTIALS')) 
-                : env('GOOGLE_APPLICATION_CREDENTIALS'),
+                        'credentials' => (function () {
+                $credentials = env('FIREBASE_CREDENTIALS');
+                if (! $credentials) {
+                    return env('GOOGLE_APPLICATION_CREDENTIALS');
+                }
+
+                // إذا كان المسار يبدأ بـ (/) أو موجوداً بالفعل كمسار مطلق، استخدمه مباشرة دون تكرار storage_path
+                if (str_starts_with($credentials, '/') && is_file($credentials)) {
+                    return $credentials;
+                }
+
+                // إذا تم تمرير storage/app/ ضمن النص، احذفها لمنع التكرار
+                $cleanPath = preg_replace('#^/?storage/app/#', '', $credentials);
+
+                return storage_path('app/' . ltrim((string) $cleanPath, '/'));
+            })(),
 
             /*
              * ------------------------------------------------------------------------

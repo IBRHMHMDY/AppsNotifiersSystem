@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class ClientApp extends Model
@@ -26,14 +27,49 @@ class ClientApp extends Model
     ];
 
     /**
-     * توليد App Key تلقائي عند إنشاء التطبيق لأول مرة
+     * الحصول على مفتاح الكاش الموحد الخاص بمفتاح التطبيق.
+     */
+    public static function getCacheKey(string $appKey): string
+    {
+        return 'client_app_key:' . hash('sha256', $appKey);
+    }
+
+    /**
+     * مسح الكاش المرتبط بالتطبيق عند التحديث أو الحذف لضمان أمان فوري.
+     */
+    public function flushAppKeyCache(): void
+    {
+        if (! empty($this->app_key)) {
+            Cache::forget(self::getCacheKey((string) $this->app_key));
+        }
+
+        $originalAppKey = $this->getOriginal('app_key');
+        if (! empty($originalAppKey) && $originalAppKey !== $this->app_key) {
+            Cache::forget(self::getCacheKey((string) $originalAppKey));
+        }
+    }
+
+    /**
+     * توليد App Key تلقائي عند الإنشاء، ومسح الكاش عند أي تعديل أو حذف.
      */
     protected static function booted(): void
     {
-        static::creating(function (ClientApp $clientApp) {
+        static::creating(function (ClientApp $clientApp): void {
             if (empty($clientApp->app_key)) {
                 $clientApp->app_key = Str::random(40);
             }
+        });
+
+        static::saved(function (ClientApp $clientApp): void {
+            $clientApp->flushAppKeyCache();
+        });
+
+        static::deleted(function (ClientApp $clientApp): void {
+            $clientApp->flushAppKeyCache();
+        });
+
+        static::restored(function (ClientApp $clientApp): void {
+            $clientApp->flushAppKeyCache();
         });
     }
 
