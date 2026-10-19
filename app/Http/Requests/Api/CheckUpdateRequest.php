@@ -25,12 +25,10 @@ class CheckUpdateRequest extends FormRequest
         return [
             'current_version' => ['nullable', 'string', 'max:50'],
             'os_type' => ['nullable', Rule::enum(OsType::class)],
+            'device_id' => ['nullable', 'string', 'max:255'],
         ];
     }
 
-    /**
-     * إرجاع الكائن الموثق ClientApp المحقون عبر الـ Middleware.
-     */
     public function clientApp(): ClientApp
     {
         /** @var ClientApp $clientApp */
@@ -39,16 +37,21 @@ class CheckUpdateRequest extends FormRequest
         return $clientApp;
     }
 
-    /**
-     * تحويل البيانات المفحوصة مباشرة إلى CheckUpdateDTO.
-     */
     public function toDto(): CheckUpdateDTO
     {
-        /** @var array{current_version?: string|null, os_type?: string|null} $validated */
+        /** @var array{current_version?: string|null, os_type?: string|null, device_id?: string|null} $validated */
         $validated = $this->validated();
+
+        $deviceIdentifier = (string) (
+            $validated['device_id']
+            ?? $this->header('X-Device-Id')
+            ?? $this->ip()
+            ?? 'default-device'
+        );
 
         return new CheckUpdateDTO(
             clientAppId: (int) $this->clientApp()->id,
+            deviceIdentifier: $deviceIdentifier,
             currentVersion: $validated['current_version'] ?? null,
             osType: isset($validated['os_type']) ? OsType::from($validated['os_type']) : null,
         );

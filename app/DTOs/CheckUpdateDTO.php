@@ -10,6 +10,7 @@ readonly class CheckUpdateDTO
 {
     public function __construct(
         public int $clientAppId,
+        public string $deviceIdentifier,
         public ?string $currentVersion = null,
         public ?OsType $osType = null,
     ) {}

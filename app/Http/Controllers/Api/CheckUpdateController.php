@@ -4,25 +4,23 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Updates\EvaluateAppUpdateAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\CheckUpdateRequest;
 use App\Http\Resources\Api\AppUpdateResource;
-use App\Models\AppUpdate;
 use Illuminate\Http\JsonResponse;
 
 class CheckUpdateController extends Controller
 {
+    public function __construct(
+        private readonly EvaluateAppUpdateAction $evaluateAppUpdateAction
+    ) {}
+
     public function __invoke(CheckUpdateRequest $request): JsonResponse
     {
-        $dto = $request->toDto();
+        $evaluation = $this->evaluateAppUpdateAction->execute($request->toDto());
 
-        /** @var AppUpdate|null $latestUpdate */
-        $latestUpdate = $request->clientApp()
-            ->updates()
-            ->latest('created_at')
-            ->first();
-
-        if (! $latestUpdate) {
+        if (! $evaluation) {
             return $this->successResponse(
                 data: null,
                 message: 'No updates available.'
@@ -30,7 +28,7 @@ class CheckUpdateController extends Controller
         }
 
         return $this->successResponse(
-            data: new AppUpdateResource($latestUpdate, $dto->currentVersion),
+            data: new AppUpdateResource($evaluation),
             message: 'Latest update fetched successfully.'
         );
     }
