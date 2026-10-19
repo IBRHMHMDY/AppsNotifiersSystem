@@ -10,6 +10,7 @@ use App\Models\AppNotification;
 use App\Models\Device;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -30,34 +31,72 @@ class ProcessAppNotificationJob implements ShouldQueue
     ) {}
 
     /**
-     * تنفيذ إرسال الإشعار عبر الواجهة المعزولة (PushNotificationServiceInterface).
+     * تنفيذ إرسال الإشعار (سواء عبر Topic أو عبر دفعات Multicast 500 جهاز).
      */
     public function handle(PushNotificationServiceInterface $pushService): void
     {
         $notification = $this->appNotification->fresh(['clientApp', 'media']);
 
-        if (! $notification || ! $notification->clientApp) {
+        if (! $notification) {
             return;
         }
 
-        // استخراج رابط الصورة من مجموعة Spatie Media Library إن وجدت
+        // إذا كان الإشعار مرتبطاً بتطبيق محدد وكان هذا التطبيق غير مفعل، نلغي الإرسال
+        if ($notification->client_app_id !== null && ! $notification->clientApp?->is_active) {
+            $notification->update(['status' => NotificationStatus::FAILED]);
+
+            return;
+        }
+
         $imageUrl = $notification->getFirstMediaUrl('notification_image') ?: null;
 
+        $customData = is_array($notification->payload_data) ? $notification->payload_data : [];
+        $payload = array_merge($customData, [
+            'notification_id' => (string) $notification->id,
+            'client_app_id' => (string) ($notification->client_app_id ?? 'all'),
+            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+        ]);
+
+        // المسار الأول: إذا كان الإشعار موجهاً إلى موضوع (Firebase Topic)
+        if (! empty($notification->topic)) {
+            $result = $pushService->sendToTopic(
+                topic: (string) $notification->topic,
+                title: (string) $notification->title,
+                body: (string) $notification->body,
+                data: $payload,
+                imageUrl: $imageUrl,
+            );
+
+            $notification->update([
+                'status' => $result->isCompletelySuccessful() ? NotificationStatus::SENT : NotificationStatus::FAILED,
+                'sent_count' => $result->successCount,
+                'failed_count' => $result->failureCount,
+                'sent_at' => now(),
+            ]);
+
+            return;
+        }
+
+        // المسار الثاني: الإرسال المجمع (Batch Multicast) للأجهزة المستهدفة (500 جهاز في كل دفعة)
         $totalSuccess = 0;
         $totalFailure = 0;
         $invalidTokensToClean = [];
 
-        // جلب الأجهزة المرتبطة بالتطبيق مع فلترة نظام التشغيل المستهدف (target_os) إن تم تحديده
         Device::query()
-            ->where('client_app_id', $notification->client_app_id)
             ->whereNotNull('fcm_token')
             ->when(
+                $notification->client_app_id !== null,
+                fn (Builder $q) => $q->where('client_app_id', $notification->client_app_id),
+                fn (Builder $q) => $q->whereHas('clientApp', fn (Builder $appQuery) => $appQuery->where('is_active', true))
+            )
+            ->when(
                 $notification->target_os !== null,
-                fn ($query) => $query->where('os_type', $notification->target_os)
+                fn (Builder $q) => $q->where('os_type', $notification->target_os)
             )
             ->chunkById(500, function (Collection $devices) use (
                 $pushService,
                 $notification,
+                $payload,
                 $imageUrl,
                 &$totalSuccess,
                 &$totalFailure,
@@ -70,10 +109,7 @@ class ProcessAppNotificationJob implements ShouldQueue
                     tokens: $tokens,
                     title: (string) $notification->title,
                     body: (string) $notification->body,
-                    data: [
-                        'notification_id' => (string) $notification->id,
-                        'client_app_id' => (string) $notification->client_app_id,
-                    ],
+                    data: $payload,
                     imageUrl: $imageUrl,
                 );
 
@@ -85,31 +121,34 @@ class ProcessAppNotificationJob implements ShouldQueue
                 }
             });
 
-        // تنظيف التوكنات غير الصالحة أو المنتهية من جدول الأجهزة تلقائياً
+        // تنظيف التوكنات التالفة أو الملغاة تلقائياً على دفعات لتجنب تجاوز حدود SQL placeholders
         if ($invalidTokensToClean !== []) {
-            Device::query()
-                ->where('client_app_id', $notification->client_app_id)
-                ->whereIn('fcm_token', array_unique($invalidTokensToClean))
-                ->delete();
+            foreach (array_chunk(array_unique($invalidTokensToClean), 500) as $tokenChunk) {
+                Device::query()
+                    ->when(
+                        $notification->client_app_id !== null,
+                        fn (Builder $q) => $q->where('client_app_id', $notification->client_app_id)
+                    )
+                    ->whereIn('fcm_token', $tokenChunk)
+                    ->delete();
+            }
         }
 
-        // تحديد الحالة النهائية للإشعار وتوثيق وقت الإرسال الفعلي (sent_at)
         $finalStatus = ($totalSuccess > 0 || $totalFailure === 0)
             ? NotificationStatus::SENT
             : NotificationStatus::FAILED;
 
         $notification->update([
             'status' => $finalStatus,
+            'sent_count' => $totalSuccess,
+            'failed_count' => $totalFailure,
             'sent_at' => now(),
         ]);
     }
 
-    /**
-     * معالجة الفشل النهائي بعد استنفاد جميع المحاولات.
-     */
     public function failed(Throwable $exception): void
     {
-        Log::error('ProcessAppNotificationJob failed permanently: '.$exception->getMessage(), [
+        Log::error('ProcessAppNotificationJob failed permanently: ' . $exception->getMessage(), [
             'notification_id' => $this->appNotification->id,
             'client_app_id' => $this->appNotification->client_app_id,
         ]);

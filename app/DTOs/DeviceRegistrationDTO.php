@@ -8,11 +8,15 @@ use App\Enums\OsType;
 
 readonly class DeviceRegistrationDTO
 {
+    /**
+     * @param  array<int, string>|null  $topics
+     */
     public function __construct(
-        public string $appKey, // مفتاح التطبيق القادم من Flutter
+        public string $appKey,
         public string $fcmToken,
         public OsType $osType,
         public string $appVersion,
         public ?int $clientAppId = null,
+        public ?array $topics = null,
     ) {}
 }

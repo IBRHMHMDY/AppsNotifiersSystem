@@ -57,7 +57,6 @@ class FirebasePushService implements PushNotificationServiceInterface
 
             $report = $this->messaging->sendMulticast($message, $validTokens);
 
-            // استخراج التوكنات غير الصالحة أو المحذوفة لتنظيف قاعدة البيانات
             $invalidTokens = array_values(array_unique(array_merge(
                 $report->unknownTokens(),
                 $report->invalidTokens()
@@ -127,8 +126,52 @@ class FirebasePushService implements PushNotificationServiceInterface
     }
 
     /**
-     * ضمان تحويل جميع قيم مصفوفة البيانات الإضافية إلى نصوص (Strings) كما يشترط FCM v1 API.
-     *
+     * {@inheritDoc}
+     */
+    public function subscribeToTopics(array $topics, array|string $tokens): bool
+    {
+        $cleanTopics = array_values(array_filter(array_unique($topics)));
+        if ($cleanTopics === []) {
+            return true;
+        }
+
+        try {
+            $this->messaging->subscribeToTopics($cleanTopics, $tokens);
+
+            return true;
+        } catch (MessagingException|Throwable $e) {
+            Log::warning('Firebase Subscribe To Topics Error: '.$e->getMessage(), [
+                'topics' => $cleanTopics,
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function unsubscribeFromTopics(array $topics, array|string $tokens): bool
+    {
+        $cleanTopics = array_values(array_filter(array_unique($topics)));
+        if ($cleanTopics === []) {
+            return true;
+        }
+
+        try {
+            $this->messaging->unsubscribeFromTopics($cleanTopics, $tokens);
+
+            return true;
+        } catch (MessagingException|Throwable $e) {
+            Log::warning('Firebase Unsubscribe From Topics Error: '.$e->getMessage(), [
+                'topics' => $cleanTopics,
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      * @return array<string, string>
      */

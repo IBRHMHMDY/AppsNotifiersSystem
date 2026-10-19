@@ -20,15 +20,28 @@ class AppNotification extends Model implements HasMedia
         'client_app_id',
         'title',
         'body',
+        'payload_data',
         'status',
         'target_os',
+        'topic',
+        'sent_count',
+        'failed_count',
+        'delivered_count',
+        'opened_count',
+        'clicked_count',
         'scheduled_at',
         'sent_at',
     ];
 
     protected $casts = [
+        'payload_data' => 'array',
         'status' => NotificationStatus::class,
         'target_os' => OsType::class,
+        'sent_count' => 'integer',
+        'failed_count' => 'integer',
+        'delivered_count' => 'integer',
+        'opened_count' => 'integer',
+        'clicked_count' => 'integer',
         'scheduled_at' => 'datetime',
         'sent_at' => 'datetime',
     ];
@@ -39,11 +52,11 @@ class AppNotification extends Model implements HasMedia
     }
 
     /**
-     * تسجيل مجموعة صور الإشعار
+     * تسجيل مجموعة صور الإشعار.
      */
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('notification_image')
-            ->singleFile(); // الإشعار يحتوي على صورة واحدة كحد أقصى
+            ->singleFile();
     }
 }

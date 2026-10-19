@@ -40,15 +40,21 @@ class AppNotificationsTable
                     ->label('العنوان')
                     ->searchable()
                     ->weight('bold')
-                    ->limit(35),
+                    ->limit(30),
 
                 TextColumn::make('clientApp.name')
                     ->label('التطبيق')
                     ->default('جميع التطبيقات')
                     ->sortable(),
 
+                TextColumn::make('topic')
+                    ->label('الموضوع (Topic)')
+                    ->badge()
+                    ->color('info')
+                    ->placeholder('بث مباشر للأجهزة'),
+
                 TextColumn::make('target_os')
-                    ->label('النظام المستهدف')
+                    ->label('النظام')
                     ->badge()
                     ->placeholder('الكل'),
 
@@ -62,12 +68,17 @@ class AppNotificationsTable
                         NotificationStatus::FAILED => 'danger',
                     }),
 
-                TextColumn::make('scheduled_at')
-                    ->label('موعد الجدولة')
-                    ->dateTime()
-                    ->sortable()
-                    ->placeholder('إرسال فوري')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('sent_count')
+                    ->label('نجاح / فشل')
+                    ->formatStateUsing(fn (AppNotification $record): string => "{$record->sent_count} / {$record->failed_count}")
+                    ->badge()
+                    ->color(fn (AppNotification $record): string => $record->failed_count > 0 ? 'warning' : 'success'),
+
+                TextColumn::make('opened_count')
+                    ->label('مرات الفتح')
+                    ->badge()
+                    ->color('primary')
+                    ->sortable(),
 
                 TextColumn::make('sent_at')
                     ->label('وقت الإرسال')

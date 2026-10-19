@@ -14,7 +14,6 @@ class SyncDeviceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // التأكد من أن الـ Middleware قام بحقن كائن التطبيق بنجاح
         return $this->attributes->get('clientApp') instanceof ClientApp;
     }
 
@@ -27,12 +26,11 @@ class SyncDeviceRequest extends FormRequest
             'fcm_token' => ['required', 'string', 'min:10', 'max:512'],
             'os_type' => ['required', Rule::enum(OsType::class)],
             'app_version' => ['required', 'string', 'max:50'],
+            'topics' => ['nullable', 'array', 'max:25'],
+            'topics.*' => ['string', 'max:64', 'regex:/^[a-zA-Z0-9-_.~%]+$/'],
         ];
     }
 
-    /**
-     * إرجاع كائن التطبيق المحقون من الـ Middleware.
-     */
     public function clientApp(): ClientApp
     {
         /** @var ClientApp $clientApp */
@@ -41,12 +39,9 @@ class SyncDeviceRequest extends FormRequest
         return $clientApp;
     }
 
-    /**
-     * بناء كائن نقل البيانات مباشرة من الطلب المفحوص.
-     */
     public function toDto(): DeviceRegistrationDTO
     {
-        /** @var array{fcm_token: string, os_type: string, app_version: string} $validated */
+        /** @var array{fcm_token: string, os_type: string, app_version: string, topics?: array<int, string>|null} $validated */
         $validated = $this->validated();
         $clientApp = $this->clientApp();
 
@@ -56,6 +51,7 @@ class SyncDeviceRequest extends FormRequest
             osType: OsType::from($validated['os_type']),
             appVersion: $validated['app_version'],
             clientAppId: (int) $clientApp->id,
+            topics: isset($validated['topics']) ? array_values(array_unique($validated['topics'])) : null,
         );
     }
 }

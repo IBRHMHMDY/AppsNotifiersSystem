@@ -18,11 +18,13 @@ class Device extends Model
         'fcm_token',
         'os_type',
         'app_version',
+        'subscribed_topics',
         'last_active_at',
     ];
 
     protected $casts = [
         'os_type' => OsType::class,
+        'subscribed_topics' => 'array',
         'last_active_at' => 'datetime',
     ];
 

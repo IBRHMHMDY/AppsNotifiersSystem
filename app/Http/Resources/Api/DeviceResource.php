@@ -14,14 +14,13 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class DeviceResource extends JsonResource
 {
     /**
-     * تحويل بيانات الجهاز إلى مصفوفة JSON موحدة.
-     *
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
         return [
             'device_id' => $this->id,
+            'subscribed_topics' => $this->subscribed_topics ?? [],
             'last_active_at' => $this->last_active_at?->toDateTimeString() ?? now()->toDateTimeString(),
         ];
     }
