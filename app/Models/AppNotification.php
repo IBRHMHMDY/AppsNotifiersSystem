@@ -9,12 +9,14 @@ use App\Enums\OsType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
 class AppNotification extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia;
+    use HasFactory, InteractsWithMedia, LogsActivity;
 
     protected $fillable = [
         'client_app_id',
@@ -46,14 +48,20 @@ class AppNotification extends Model implements HasMedia
         'sent_at' => 'datetime',
     ];
 
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('app_notifications')
+            ->logOnly(['client_app_id', 'title', 'status', 'target_os', 'topic', 'scheduled_at'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges();
+    }
+
     public function clientApp(): BelongsTo
     {
         return $this->belongsTo(ClientApp::class);
     }
 
-    /**
-     * تسجيل مجموعة صور الإشعار.
-     */
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('notification_image')

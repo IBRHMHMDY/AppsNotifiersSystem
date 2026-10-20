@@ -122,7 +122,7 @@ class EvaluateAppUpdateAction
         }
 
         // توليد رقم ثابت بين 0 و 99 لكل جهاز مع هذا التحديث تحديداً
-        $hashBucket = abs(crc32($deviceIdentifier . ':update:' . $updateId)) % 100;
+        $hashBucket = abs(crc32($deviceIdentifier.':update:'.$updateId)) % 100;
 
         return $hashBucket < $percentage;
     }

@@ -148,7 +148,7 @@ class ProcessAppNotificationJob implements ShouldQueue
 
     public function failed(Throwable $exception): void
     {
-        Log::error('ProcessAppNotificationJob failed permanently: ' . $exception->getMessage(), [
+        Log::error('ProcessAppNotificationJob failed permanently: '.$exception->getMessage(), [
             'notification_id' => $this->appNotification->id,
             'client_app_id' => $this->appNotification->client_app_id,
         ]);

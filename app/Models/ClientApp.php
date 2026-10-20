@@ -10,10 +10,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 class ClientApp extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -26,17 +28,20 @@ class ClientApp extends Model
         'is_active' => 'boolean',
     ];
 
-    /**
-     * الحصول على مفتاح الكاش الموحد الخاص بمفتاح التطبيق.
-     */
-    public static function getCacheKey(string $appKey): string
+    public function getActivitylogOptions(): LogOptions
     {
-        return 'client_app_key:' . hash('sha256', $appKey);
+        return LogOptions::defaults()
+            ->useLogName('client_apps')
+            ->logOnly(['name', 'bundle_id', 'is_active'])
+            ->logOnlyDirty()
+            ->dontLogEmptyChanges();
     }
 
-    /**
-     * مسح الكاش المرتبط بالتطبيق عند التحديث أو الحذف لضمان أمان فوري.
-     */
+    public static function getCacheKey(string $appKey): string
+    {
+        return 'client_app_key:'.hash('sha256', $appKey);
+    }
+
     public function flushAppKeyCache(): void
     {
         if (! empty($this->app_key)) {
@@ -49,9 +54,6 @@ class ClientApp extends Model
         }
     }
 
-    /**
-     * توليد App Key تلقائي عند الإنشاء، ومسح الكاش عند أي تعديل أو حذف.
-     */
     protected static function booted(): void
     {
         static::creating(function (ClientApp $clientApp): void {

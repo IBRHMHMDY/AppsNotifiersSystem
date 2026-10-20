@@ -11,7 +11,7 @@ enum OsType: string
 
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::ANDROID => 'Android',
             self::IOS => 'iOS',
         };

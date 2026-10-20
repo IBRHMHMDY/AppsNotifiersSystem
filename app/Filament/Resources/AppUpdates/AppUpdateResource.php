@@ -11,18 +11,21 @@ use App\Filament\Resources\AppUpdates\Schemas\AppUpdateInfolist;
 use App\Filament\Resources\AppUpdates\Tables\AppUpdatesTable;
 use App\Models\AppUpdate;
 use BackedEnum;
-use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-
 use Filament\Tables\Table;
+use UnitEnum;
 
 class AppUpdateResource extends Resource
 {
-   protected static ?string $model = AppUpdate::class;
+    protected static ?string $model = AppUpdate::class;
+
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
+
     protected static ?string $navigationLabel = 'تحديثات التطبيقات';
+
     protected static ?string $modelLabel = 'تحديث';
+
     protected static string|UnitEnum|null $navigationGroup = 'إدارة النظام';
 
     public static function form(Schema $schema): Schema

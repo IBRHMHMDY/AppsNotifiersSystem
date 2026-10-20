@@ -19,7 +19,7 @@ return new class extends Migration
             $table->boolean('is_force_update')->default(false); // هل التحديث إجباري؟
             $table->text('release_notes')->nullable();
             $table->timestamps();
-            
+
             // نمنع إضافة نفس رقم الإصدار لنفس التطبيق مرتين
             $table->unique(['client_app_id', 'version']);
         });

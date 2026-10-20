@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Contracts\PushNotificationServiceInterface;
+use App\Models\User;
 use App\Services\FirebasePushService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -46,15 +48,19 @@ class AppServiceProvider extends ServiceProvider
     private function configureRateLimiting(): void
     {
         RateLimiter::for('device-sync', static function (Request $request): Limit {
-            $identifier = $request->ip() . '|' . $request->header('X-App-Key', 'anonymous');
+            $identifier = $request->ip().'|'.$request->header('X-App-Key', 'anonymous');
 
             return Limit::perMinute(15)->by($identifier);
         });
 
         RateLimiter::for('update-check', static function (Request $request): Limit {
-            $identifier = $request->ip() . '|' . $request->header('X-App-Key', 'anonymous');
+            $identifier = $request->ip().'|'.$request->header('X-App-Key', 'anonymous');
 
             return Limit::perMinute(60)->by($identifier);
+        });
+
+        Gate::define('viewPulse', static function (User $user): bool {
+            return true; // أو $user->hasRole('super_admin') عند تفعيل الأدوار
         });
     }
 }

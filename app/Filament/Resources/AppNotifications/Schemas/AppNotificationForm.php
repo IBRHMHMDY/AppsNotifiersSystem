@@ -73,8 +73,8 @@ class AppNotificationForm
 
                                 return new HtmlString(
                                     "<div style='padding:10px 14px;border-radius:8px;font-weight:600;{$badgeColor}'>"
-                                    . "الجمهور المطابق في قاعدة البيانات: <strong>" . number_format($count) . "</strong> جهاز{$topicLabel}."
-                                    . "</div>"
+                                    .'الجمهور المطابق في قاعدة البيانات: <strong>'.number_format($count)."</strong> جهاز{$topicLabel}."
+                                    .'</div>'
                                 );
                             }),
 
@@ -138,7 +138,7 @@ class AppNotificationForm
                                 return new HtmlString("
                                     <div style='background:#0f172a;padding:18px;border-radius:18px;color:#f8fafc;box-shadow:0 10px 25px -5px rgba(0,0,0,0.25);'>
                                         <div style='display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#94a3b8;margin-bottom:10px;'>
-                                            <span><strong>" . e((string) $appName) . "</strong> • الآن</span>
+                                            <span><strong>".e((string) $appName)."</strong> • الآن</span>
                                             <div>{$topicBadge}<span style='background:#1e293b;padding:2px 8px;border-radius:99px;'>{$osBadge}</span></div>
                                         </div>
                                         <div style='background:rgba(255,255,255,0.08);backdrop-filter:blur(8px);padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);'>

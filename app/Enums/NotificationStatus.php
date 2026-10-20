@@ -13,7 +13,7 @@ enum NotificationStatus: string
 
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::PENDING => 'قيد الانتظار',
             self::PROCESSING => 'جاري الإرسال',
             self::SENT => 'تم الإرسال',

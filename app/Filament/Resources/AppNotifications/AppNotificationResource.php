@@ -19,9 +19,13 @@ use UnitEnum;
 class AppNotificationResource extends Resource
 {
     protected static ?string $model = AppNotification::class;
+
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-bell-alert';
+
     protected static ?string $navigationLabel = 'الإشعارات';
+
     protected static ?string $modelLabel = 'إشعار';
+
     protected static string|UnitEnum|null $navigationGroup = 'التواصل';
 
     public static function form(Schema $schema): Schema

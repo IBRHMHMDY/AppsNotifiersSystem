@@ -45,7 +45,7 @@ class FirebasePushService implements PushNotificationServiceInterface
         $validTokens = array_values(array_filter(array_unique($tokens)));
 
         if ($validTokens === []) {
-            return new PushDeliveryResultDTO();
+            return new PushDeliveryResultDTO;
         }
 
         try {

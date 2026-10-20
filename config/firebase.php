@@ -50,7 +50,7 @@ return [
              *
              */
 
-                        'credentials' => (function () {
+            'credentials' => (function () {
                 $credentials = env('FIREBASE_CREDENTIALS');
                 if (! $credentials) {
                     return env('GOOGLE_APPLICATION_CREDENTIALS');
@@ -64,7 +64,7 @@ return [
                 // إذا تم تمرير storage/app/ ضمن النص، احذفها لمنع التكرار
                 $cleanPath = preg_replace('#^/?storage/app/#', '', $credentials);
 
-                return storage_path('app/' . ltrim((string) $cleanPath, '/'));
+                return storage_path('app/'.ltrim((string) $cleanPath, '/'));
             })(),
 
             /*
