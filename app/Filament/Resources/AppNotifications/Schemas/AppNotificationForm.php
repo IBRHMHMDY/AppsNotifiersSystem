@@ -13,7 +13,6 @@ use App\Models\Device;
 use App\Services\TargetAudienceService;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\KeyValue;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
@@ -74,7 +73,7 @@ class AppNotificationForm
 
                         TextEntry::make('type_description_banner')
                             ->hiddenLabel()
-                            ->content(function (Get $get): HtmlString {
+                            ->state(function (Get $get): HtmlString {
                                 $rawType = $get('type');
                                 $type = $rawType instanceof NotificationType
                                     ? $rawType
@@ -94,7 +93,7 @@ class AppNotificationForm
                                 );
                             })
                             ->columnSpanFull(),
-                    ]),
+                    ])->columnSpanFull(),
 
                 // القسم الثاني: محرك الاستهداف الدقيق
                 Section::make('2. الجمهور وطريقة الاستهداف (Audience & Targeting)')
@@ -211,9 +210,9 @@ class AppNotificationForm
                             ->columnSpanFull(),
 
                         // مؤشر الوصول اللحظي (Live Audience Reach Counter)
-                        Placeholder::make('estimated_reach_counter')
+                        TextEntry::make('estimated_reach_counter')
                             ->label('ملخص الوصول التقديري (Live Reach)')
-                            ->content(function (Get $get): HtmlString {
+                            ->state(function (Get $get): HtmlString {
                                 $targetType = self::resolveTargetType($get('target_type'));
                                 $clientAppId = $get('client_app_id') ? (int) $get('client_app_id') : null;
                                 $osType = $get('target_os');
@@ -244,9 +243,8 @@ class AppNotificationForm
                                     "<span class='text-xs font-medium uppercase px-2 py-1 rounded bg-white/60 dark:bg-black/30'>{$targetType->getLabel()}</span>" .
                                     '</div>'
                                 );
-                            })
-                            ->columnSpanFull(),
-                    ])->columns(2),
+                            })->columnSpanFull(),
+                    ])->columnSpanFull(),
 
                 // القسم الثالث: المحتوى المرئي والمرفقات (يختفي تلقائياً إذا كان الإشعار صامتاً)
                 Section::make('3. محتوى الإشعار والمرفقات (Content & Media)')

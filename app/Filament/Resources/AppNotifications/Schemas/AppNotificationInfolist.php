@@ -73,7 +73,7 @@ class AppNotificationInfolist
                             ->label('تاريخ الإرسال الفعلي')
                             ->dateTime('Y-m-d h:i A')
                             ->placeholder('لم يُرسل بعد'),
-                    ])->columns(4),
+                    ])->columns(2),
 
                 // القسم الثاني: إحصائيات الأداء والتفاعل
                 Section::make('إحصائيات الأداء والتفاعل (Delivery & Engagement Analytics)')
@@ -121,7 +121,7 @@ class AppNotificationInfolist
                             })
                             ->badge()
                             ->color('success'),
-                    ])->columns(6),
+                    ])->columns(2),
 
                 // القسم الثالث: المحتوى، التوجيه، والبيانات المرفقة
                 Section::make('محتوى الرسالة، سلوك النقر، والبيانات البرمجية')
@@ -161,7 +161,7 @@ class AppNotificationInfolist
                             ->valueLabel('القيمة (Value)')
                             ->placeholder('لا توجد بيانات إضافية مرفقة')
                             ->columnSpanFull(),
-                    ])->columns(4),
+                    ])->columns(2),
             ]);
     }
 }
