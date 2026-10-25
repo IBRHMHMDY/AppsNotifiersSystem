@@ -19,6 +19,7 @@ use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -34,7 +35,7 @@ class AppNotificationForm
                 // القسم الأول: الهوية وتصنيف الإشعار
                 Section::make('1. الهوية وتصنيف الإشعار (Identity & Classification)')
                     ->description('حدد التطبيق المستهدف وطبيعة الإشعار لتكييف خيارات المحتوى والإرسال تلقائياً.')
-                    ->icon('heroicon-o-Squares-2x2')
+                    ->icon('heroicon-o-squares-2x2')
                     ->schema([
                         Select::make('client_app_id')
                             ->label('التطبيق المستهدف')
@@ -45,7 +46,6 @@ class AppNotificationForm
                             ->preload()
                             ->live()
                             ->afterStateUpdated(function (Set $set): void {
-                                // إعادة ضبط الفلاتر المرتبطة بالتطبيق عند تغييره
                                 $set('target_app_versions', []);
                                 $set('target_device_ids', []);
                             })
@@ -72,7 +72,7 @@ class AppNotificationForm
                             })
                             ->columnSpanFull(),
 
-                        Placeholder::make('type_description_banner')
+                        TextEntry::make('type_description_banner')
                             ->hiddenLabel()
                             ->content(function (Get $get): HtmlString {
                                 $rawType = $get('type');
@@ -88,8 +88,8 @@ class AppNotificationForm
                                 };
 
                                 return new HtmlString(
-                                    "<div class='rounded-lg border-r-4 p-3 text-sm {$badgeColor}'>".
-                                    "<strong>{$type->getLabel()}:</strong> {$type->getDescription()}".
+                                    "<div class='rounded-lg border-r-4 p-3 text-sm {$badgeColor}'>" .
+                                    "<strong>{$type->getLabel()}:</strong> {$type->getDescription()}" .
                                     '</div>'
                                 );
                             })
@@ -157,9 +157,9 @@ class AppNotificationForm
 
                         // خيار 2: الاستهداف عبر شريحة مفلترة (Segmented)
                         ToggleButtons::make('target_os')
-                            ->label('نظام التشغيل (OS)')
+                            ->label('نظام التشغيل المستهدف (اختياري)')
                             ->options(OsType::class)
-                            ->placeholder('كل الأنظمة')
+                            ->helperText('اختر نظاماً محدداً، أو اتركه بدون تحديد ليشمل جميع الأنظمة (Android & iOS).')
                             ->inline()
                             ->live()
                             ->visible(fn (Get $get): bool => self::resolveTargetType($get('target_type')) === NotificationTargetType::Segmented),
@@ -200,7 +200,7 @@ class AppNotificationForm
                                     ->mapWithKeys(function (Device $device): array {
                                         $os = $device->os_type?->getLabel() ?? 'Unknown OS';
                                         $version = $device->app_version ? "v{$device->app_version}" : 'v?';
-                                        $shortToken = substr((string) $device->fcm_token, 0, 12).'...';
+                                        $shortToken = substr((string) $device->fcm_token, 0, 12) . '...';
 
                                         return [$device->id => "جهاز #{$device->id} ({$os} • {$version}) [{$shortToken}]"];
                                     })
@@ -239,9 +239,9 @@ class AppNotificationForm
                                     : 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300';
 
                                 return new HtmlString(
-                                    "<div class='flex items-center justify-between rounded-lg border p-3 {$colorClass}'>".
-                                    "<div><span class='font-semibold'>الجمهور المطابق حالياً:</span> نحو <strong>{$count}</strong> جهاز مسجل{$extraNote}.</div>".
-                                    "<span class='text-xs font-medium uppercase px-2 py-1 rounded bg-white/60 dark:bg-black/30'>{$targetType->getLabel()}</span>".
+                                    "<div class='flex items-center justify-between rounded-lg border p-3 {$colorClass}'>" .
+                                    "<div><span class='font-semibold'>الجمهور المطابق حالياً:</span> نحو <strong>{$count}</strong> جهاز مسجل{$extraNote}.</div>" .
+                                    "<span class='text-xs font-medium uppercase px-2 py-1 rounded bg-white/60 dark:bg-black/30'>{$targetType->getLabel()}</span>" .
                                     '</div>'
                                 );
                             })
