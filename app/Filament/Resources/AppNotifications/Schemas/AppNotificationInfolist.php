@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\AppNotifications\Schemas;
 
+use App\Models\AppNotification;
 use Filament\Infolists\Components\KeyValueEntry;
+use Filament\Infolists\Components\SpatieMediaLibraryImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -15,88 +17,109 @@ class AppNotificationInfolist
     {
         return $schema
             ->components([
-                Section::make('تفاصيل الإشعار')
+                Section::make('تفاصيل الإشعار والاستهداف')
                     ->schema([
                         TextEntry::make('clientApp.name')
-                            ->label('التطبيق المستهدف')
-                            ->placeholder('جميع التطبيقات'),
+                            ->label('التطبيق')
+                            ->badge()
+                            ->color('primary'),
 
                         TextEntry::make('status')
-                            ->label('الحالة')
+                            ->label('حالة الإشعار')
                             ->badge(),
 
                         TextEntry::make('target_os')
-                            ->label('نظام التشغيل')
+                            ->label('نظام التشغيل المستهدف')
                             ->badge()
-                            ->placeholder('جميع الأنظمة'),
+                            ->placeholder('جميع الأنظمة (All OS)'),
 
                         TextEntry::make('topic')
-                            ->label('الموضوع (Topic)')
+                            ->label('الموضوع المستهدف (Topic)')
                             ->badge()
                             ->color('info')
-                            ->placeholder('بث مباشر للأجهزة'),
+                            ->placeholder('بث عام (Broadcast)'),
 
-                        TextEntry::make('title')
-                            ->label('العنوان')
-                            ->columnSpanFull(),
+                        TextEntry::make('scheduled_at')
+                            ->label('موعد الجدولة')
+                            ->dateTime('Y-m-d h:i A')
+                            ->placeholder('إرسال فوري'),
 
-                        TextEntry::make('body')
-                            ->label('محتوى الإشعار')
-                            ->columnSpanFull(),
+                        TextEntry::make('sent_at')
+                            ->label('تاريخ الإرسال الفعلي')
+                            ->dateTime('Y-m-d h:i A')
+                            ->placeholder('لم يُرسل بعد'),
+                    ])->columns(3),
 
-                        KeyValueEntry::make('payload_data')
-                            ->label('البيانات المخصصة (Payload Data)')
-                            ->columnSpanFull(),
-                    ])
-                    ->columns(4),
-
-                Section::make('مؤشرات الأداء والتتبع التلقائي (Delivery & Engagement)')
+                Section::make('إحصائيات الأداء والتفاعل (Analytics)')
+                    ->description('مؤشرات وصول الإشعار وتفاعل المستخدمين معه في الوقت الفعلي.')
                     ->schema([
                         TextEntry::make('sent_count')
-                            ->label('تم الإرسال (Sent)')
-                            ->badge()
-                            ->color('success'),
-
-                        TextEntry::make('failed_count')
-                            ->label('فشل الإرسال (Failed)')
-                            ->badge()
-                            ->color('danger'),
-
-                        TextEntry::make('delivered_count')
-                            ->label('تم الاستلام (Delivered)')
+                            ->label('إجمالي المرسل (Sent)')
+                            ->numeric()
                             ->badge()
                             ->color('info'),
 
+                        TextEntry::make('delivered_count')
+                            ->label('تم الاستلام (Delivered)')
+                            ->numeric()
+                            ->badge()
+                            ->color('success'),
+
                         TextEntry::make('opened_count')
                             ->label('تم الفتح (Opened)')
+                            ->numeric()
                             ->badge()
                             ->color('primary'),
 
                         TextEntry::make('clicked_count')
                             ->label('تم النقر (Clicked)')
+                            ->numeric()
                             ->badge()
                             ->color('warning'),
-                    ])
-                    ->columns(5),
 
-                Section::make('التوقيت الزمني')
+                        TextEntry::make('failed_count')
+                            ->label('فشل الإرسال (Failed)')
+                            ->numeric()
+                            ->badge()
+                            ->color('danger'),
+
+                        TextEntry::make('ctr')
+                            ->label('معدل التحويل (CTR)')
+                            ->state(function (AppNotification $record): string {
+                                if ($record->sent_count === 0) {
+                                    return '0%';
+                                }
+
+                                return round(($record->opened_count / $record->sent_count) * 100, 2) . '%';
+                            })
+                            ->badge()
+                            ->color('success'),
+                    ])->columns(6),
+
+                Section::make('محتوى الرسالة والبيانات المرفقة')
                     ->schema([
-                        TextEntry::make('scheduled_at')
-                            ->label('موعد الجدولة')
-                            ->dateTime()
-                            ->placeholder('-'),
+                        TextEntry::make('title')
+                            ->label('عنوان الإشعار')
+                            ->weight('bold')
+                            ->columnSpanFull(),
 
-                        TextEntry::make('sent_at')
-                            ->label('وقت الإرسال الفعلي')
-                            ->dateTime()
-                            ->placeholder('-'),
+                        TextEntry::make('body')
+                            ->label('نص الإشعار')
+                            ->columnSpanFull(),
 
-                        TextEntry::make('created_at')
-                            ->label('تاريخ الإنشاء')
-                            ->dateTime()
-                            ->placeholder('-'),
-                    ])
-                    ->columns(3),
+                        SpatieMediaLibraryImageEntry::make('notification_image')
+                            ->label('صورة الإشعار')
+                            ->collection('notification_image')
+                            ->placeholder('لا توجد صورة مرفقة')
+                            ->columnSpanFull(),
+
+                        KeyValueEntry::make('payload_data') // تم تصحيح الاسم ليطابق المودل وقاعدة البيانات
+                            ->label('البيانات الإضافية (Payload Data)')
+                            ->keyLabel('المفتاح (Key)')
+                            ->valueLabel('القيمة (Value)')
+                            ->placeholder('لا توجد بيانات إضافية مرفقة')
+                            ->columnSpanFull(),
+                    ]),
             ]);
     }
 }

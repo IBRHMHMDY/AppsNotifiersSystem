@@ -9,9 +9,7 @@ use App\Enums\NotificationStatus;
 use App\Enums\OsType;
 use App\Models\AppNotification;
 use Filament\Actions\Action;
-use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -20,81 +18,108 @@ use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
-use Throwable;
 
 class AppNotificationsTable
 {
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['clientApp', 'media']))
             ->columns([
-                SpatieMediaLibraryImageColumn::make('image')
+                SpatieMediaLibraryImageColumn::make('notification_image')
                     ->label('الصورة')
                     ->collection('notification_image')
                     ->circular(),
 
                 TextColumn::make('title')
-                    ->label('العنوان')
+                    ->label('عنوان الإشعار')
                     ->searchable()
-                    ->weight('bold')
-                    ->limit(30),
+                    ->limit(30)
+                    ->weight('bold'),
 
                 TextColumn::make('clientApp.name')
                     ->label('التطبيق')
-                    ->default('جميع التطبيقات')
-                    ->sortable(),
-
-                TextColumn::make('topic')
-                    ->label('الموضوع (Topic)')
-                    ->badge()
-                    ->color('info')
-                    ->placeholder('بث مباشر للأجهزة'),
-
-                TextColumn::make('target_os')
-                    ->label('النظام')
-                    ->badge()
-                    ->placeholder('الكل'),
-
-                TextColumn::make('status')
-                    ->label('الحالة')
-                    ->badge()
-                    ->color(fn (NotificationStatus $state): string => match ($state) {
-                        NotificationStatus::PENDING => 'gray',
-                        NotificationStatus::PROCESSING => 'warning',
-                        NotificationStatus::SENT => 'success',
-                        NotificationStatus::FAILED => 'danger',
-                    }),
-
-                TextColumn::make('sent_count')
-                    ->label('نجاح / فشل')
-                    ->formatStateUsing(fn (AppNotification $record): string => "{$record->sent_count} / {$record->failed_count}")
-                    ->badge()
-                    ->color(fn (AppNotification $record): string => $record->failed_count > 0 ? 'warning' : 'success'),
-
-                TextColumn::make('opened_count')
-                    ->label('مرات الفتح')
                     ->badge()
                     ->color('primary')
                     ->sortable(),
 
-                TextColumn::make('sent_at')
-                    ->label('وقت الإرسال')
-                    ->dateTime()
+                TextColumn::make('targeting')
+                    ->label('الاستهداف')
+                    ->badge()
+                    ->state(function (AppNotification $record): string {
+                        if (! empty($record->topic)) {
+                            return 'topic';
+                        }
+
+                        if ($record->target_os !== null) {
+                            return 'os';
+                        }
+
+                        return 'all';
+                    })
+                    ->formatStateUsing(fn (string $state, AppNotification $record): string => match ($state) {
+                        'all' => 'الكل (Broadcast)',
+                        'os' => 'نظام: ' . ($record->target_os?->getLabel() ?? ''),
+                        'topic' => 'موضوع: ' . ($record->topic ?? ''),
+                        default => $state,
+                    })
+                    ->color(fn (string $state): string => match ($state) {
+                        'all' => 'info',
+                        'os' => 'warning',
+                        'topic' => 'success',
+                        default => 'gray',
+                    }),
+
+                TextColumn::make('status')
+                    ->label('الحالة')
+                    ->badge()
+                    ->sortable(),
+
+                TextColumn::make('sent_count')
+                    ->label('تم الإرسال')
+                    ->numeric()
                     ->sortable()
-                    ->placeholder('-'),
+                    ->color('success'),
+
+                TextColumn::make('opened_count')
+                    ->label('تم الفتح')
+                    ->numeric()
+                    ->sortable()
+                    ->color('info'),
+
+                TextColumn::make('CTR')
+                    ->label('نسبة التفاعل (CTR)')
+                    ->state(function (AppNotification $record): string {
+                        if ($record->sent_count === 0) {
+                            return '0%';
+                        }
+                        $ctr = ($record->opened_count / $record->sent_count) * 100;
+
+                        return round($ctr, 1) . '%';
+                    })
+                    ->badge()
+                    ->color(fn (string $state): string => (float) $state > 10.0 ? 'success' : 'gray'),
+
+                TextColumn::make('scheduled_at')
+                    ->label('وقت الجدولة')
+                    ->dateTime('Y-m-d h:i A')
+                    ->placeholder('إرسال فوري')
+                    ->sortable(),
+
+                TextColumn::make('sent_at')
+                    ->label('تاريخ الإرسال الفعلي')
+                    ->dateTime('Y-m-d h:i A')
+                    ->placeholder('لم يُرسل بعد')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('client_app_id')
                     ->label('التطبيق')
-                    ->relationship('clientApp', 'name')
-                    ->searchable()
-                    ->preload(),
+                    ->relationship('clientApp', 'name'),
 
                 SelectFilter::make('status')
-                    ->label('الحالة')
+                    ->label('حالة الإشعار')
                     ->options(NotificationStatus::class),
 
                 SelectFilter::make('target_os')
@@ -103,66 +128,38 @@ class AppNotificationsTable
             ])
             ->recordActions([
                 Action::make('dispatch')
-                    ->label(fn (AppNotification $record): string => $record->status === NotificationStatus::FAILED ? 'إعادة الإرسال' : 'إرسال الآن')
-                    ->icon(fn (AppNotification $record): string => $record->status === NotificationStatus::FAILED ? 'heroicon-o-arrow-path' : 'heroicon-o-paper-airplane')
-                    ->color(fn (AppNotification $record): string => $record->status === NotificationStatus::FAILED ? 'warning' : 'success')
+                    ->label('Send Now')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('success')
                     ->requiresConfirmation()
-                    ->modalHeading('تأكيد دفع الإشعار للإرسال')
-                    ->modalDescription('هل أنت متأكد من جدولة هذا الإشعار في طابور الإرسال الآن؟')
-                    ->visible(fn (AppNotification $record): bool => in_array(
-                        $record->status,
-                        [NotificationStatus::PENDING, NotificationStatus::FAILED],
-                        true
-                    ))
-                    ->action(function (AppNotification $record, DispatchNotificationAction $dispatchAction): void {
-                        try {
-                            $dispatchAction->execute($record);
+                    ->modalHeading('تأكيد الإرسال الفوري')
+                    ->modalDescription(fn (AppNotification $record): string => $record->scheduled_at !== null && $record->scheduled_at->isFuture()
+                        ? 'هذا الإشعار مجدول للإرسال في (' . $record->scheduled_at->format('Y-m-d h:i A') . '). هل تريد تجاوز الجدولة وإرساله الآن فوراً؟'
+                        : 'هل أنت متأكد من إرسال هذا الإشعار الآن لجميع الأجهزة المستهدفة؟'
+                    )
+                    ->modalSubmitActionLabel('نعم، أرسل الآن')
+                    ->visible(fn (AppNotification $record): bool => in_array($record->status, [
+                        NotificationStatus::PENDING,
+                        NotificationStatus::FAILED,
+                    ], true))
+                    ->action(function (AppNotification $record, DispatchNotificationAction $dispatcher): void {
+                        // تغيير اسم المتغير إلى $dispatcher لتجنب التعارض مع متغير $action المحجوز في Filament
+                        $dispatcher->execute($record, forceNow: true);
 
-                            Notification::make()
-                                ->title('تم وضع الإشعار في طابور الإرسال بنجاح')
-                                ->success()
-                                ->send();
-                        } catch (Throwable $e) {
-                            Notification::make()
-                                ->title('حدث خطأ أثناء جدولة الإشعار')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
+                        Notification::make()
+                            ->title('تم دفع الإشعار للإرسال الفوري')
+                            ->body('تتم الآن معالجة الإشعار في الخلفية وإرساله للأجهزة.')
+                            ->success()
+                            ->send();
                     }),
 
                 ViewAction::make(),
                 EditAction::make(),
-                DeleteAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    BulkAction::make('dispatch_selected')
-                        ->label('إرسال الإشعارات المحددة')
-                        ->icon('heroicon-o-paper-airplane')
-                        ->color('success')
-                        ->requiresConfirmation()
-                        ->action(function (Collection $records, DispatchNotificationAction $dispatchAction): void {
-                            $dispatchedCount = 0;
-
-                            /** @var AppNotification $record */
-                            foreach ($records as $record) {
-                                if (in_array($record->status, [NotificationStatus::PENDING, NotificationStatus::FAILED], true)) {
-                                    $dispatchAction->execute($record);
-                                    $dispatchedCount++;
-                                }
-                            }
-
-                            Notification::make()
-                                ->title("تم دفع {$dispatchedCount} إشعار إلى طابور الإرسال")
-                                ->success()
-                                ->send();
-                        })
-                        ->deselectRecordsAfterCompletion(),
-
                     DeleteBulkAction::make(),
                 ]),
-            ])
-            ->defaultSort('created_at', 'desc');
+            ]);
     }
 }
