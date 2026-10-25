@@ -46,7 +46,7 @@ enum NotificationActionType: string implements HasColor, HasDescription, HasIcon
     {
         return match ($this) {
             self::OpenApp => 'heroicon-o-arrow-top-right-on-square',
-            self::DeepLink => 'heroicon-o-arrows-Pointing-in',
+            self::DeepLink => 'heroicon-o-arrows-pointing-in',
             self::ExternalUrl => 'heroicon-o-link',
         };
     }
