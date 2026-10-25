@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\AppNotifications\Schemas;
 
+use App\Enums\NotificationTargetType;
 use App\Models\AppNotification;
 use Filament\Infolists\Components\KeyValueEntry;
 use Filament\Infolists\Components\SpatieMediaLibraryImageEntry;
@@ -17,27 +18,51 @@ class AppNotificationInfolist
     {
         return $schema
             ->components([
-                Section::make('تفاصيل الإشعار والاستهداف')
+                // القسم الأول: بطاقة الهوية والاستهداف
+                Section::make('الهوية، التصنيف، وتفاصيل الاستهداف')
+                    ->icon('heroicon-o-funnel')
                     ->schema([
                         TextEntry::make('clientApp.name')
-                            ->label('التطبيق')
+                            ->label('التطبيق المستهدف')
+                            ->placeholder('جميع التطبيقات النشطة (Broadcast)')
                             ->badge()
                             ->color('primary'),
 
-                        TextEntry::make('status')
-                            ->label('حالة الإشعار')
+                        TextEntry::make('type')
+                            ->label('نوع الإشعار')
                             ->badge(),
 
-                        TextEntry::make('target_os')
-                            ->label('نظام التشغيل المستهدف')
+                        TextEntry::make('status')
+                            ->label('حالة الإرسال')
+                            ->badge(),
+
+                        TextEntry::make('target_type')
+                            ->label('طريقة الاستهداف')
+                            ->badge(),
+
+                        TextEntry::make('target_summary')
+                            ->label('ملخص الجمهور المستهدف')
                             ->badge()
-                            ->placeholder('جميع الأنظمة (All OS)'),
+                            ->color('info'),
+
+                        TextEntry::make('target_os')
+                            ->label('نظام التشغيل (OS)')
+                            ->badge()
+                            ->placeholder('جميع الأنظمة (All OS)')
+                            ->visible(fn (AppNotification $record): bool => $record->target_type === NotificationTargetType::Segmented),
+
+                        TextEntry::make('target_app_versions')
+                            ->label('الإصدارات المستهدفة')
+                            ->badge()
+                            ->placeholder('جميع الإصدارات')
+                            ->visible(fn (AppNotification $record): bool => $record->target_type === NotificationTargetType::Segmented),
 
                         TextEntry::make('topic')
-                            ->label('الموضوع المستهدف (Topic)')
+                            ->label('قناة الموضوع (FCM Topic)')
                             ->badge()
-                            ->color('info')
-                            ->placeholder('بث عام (Broadcast)'),
+                            ->color('warning')
+                            ->formatStateUsing(fn (?string $state): string => $state ? "#{$state}" : '-')
+                            ->visible(fn (AppNotification $record): bool => $record->target_type === NotificationTargetType::Topic || ! empty($record->topic)),
 
                         TextEntry::make('scheduled_at')
                             ->label('موعد الجدولة')
@@ -48,10 +73,12 @@ class AppNotificationInfolist
                             ->label('تاريخ الإرسال الفعلي')
                             ->dateTime('Y-m-d h:i A')
                             ->placeholder('لم يُرسل بعد'),
-                    ])->columns(3),
+                    ])->columns(4),
 
-                Section::make('إحصائيات الأداء والتفاعل (Analytics)')
+                // القسم الثاني: إحصائيات الأداء والتفاعل
+                Section::make('إحصائيات الأداء والتفاعل (Delivery & Engagement Analytics)')
                     ->description('مؤشرات وصول الإشعار وتفاعل المستخدمين معه في الوقت الفعلي.')
+                    ->icon('heroicon-o-chart-bar')
                     ->schema([
                         TextEntry::make('sent_count')
                             ->label('إجمالي المرسل (Sent)')
@@ -96,30 +123,45 @@ class AppNotificationInfolist
                             ->color('success'),
                     ])->columns(6),
 
-                Section::make('محتوى الرسالة والبيانات المرفقة')
+                // القسم الثالث: المحتوى، التوجيه، والبيانات المرفقة
+                Section::make('محتوى الرسالة، سلوك النقر، والبيانات البرمجية')
+                    ->icon('heroicon-o-chat-bubble-bottom-center-text')
                     ->schema([
                         TextEntry::make('title')
                             ->label('عنوان الإشعار')
                             ->weight('bold')
-                            ->columnSpanFull(),
+                            ->placeholder('إشعار صامت (بدون عنوان مرئي)')
+                            ->columnSpan(2),
+
+                        TextEntry::make('action_type')
+                            ->label('إجراء النقر (Click Action)')
+                            ->badge(),
+
+                        TextEntry::make('action_value')
+                            ->label('مسار التوجيه / الرابط (Action Target)')
+                            ->placeholder('لا يوجد توجيه إضافي')
+                            ->copyable()
+                            ->color('primary'),
 
                         TextEntry::make('body')
                             ->label('نص الإشعار')
+                            ->placeholder('إشعار صامت (بدون نص مرئي)')
                             ->columnSpanFull(),
 
                         SpatieMediaLibraryImageEntry::make('notification_image')
-                            ->label('صورة الإشعار')
+                            ->label('صورة الإشعار المرفقة')
                             ->collection('notification_image')
                             ->placeholder('لا توجد صورة مرفقة')
+                            ->visible(fn (AppNotification $record): bool => ! $record->type?->isSilent())
                             ->columnSpanFull(),
 
-                        KeyValueEntry::make('payload_data') // تم تصحيح الاسم ليطابق المودل وقاعدة البيانات
-                            ->label('البيانات الإضافية (Payload Data)')
+                        KeyValueEntry::make('payload_data')
+                            ->label('البيانات الإضافية المخصصة (Custom Payload Data)')
                             ->keyLabel('المفتاح (Key)')
                             ->valueLabel('القيمة (Value)')
                             ->placeholder('لا توجد بيانات إضافية مرفقة')
                             ->columnSpanFull(),
-                    ]),
+                    ])->columns(4),
             ]);
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Resources\AppNotifications\Pages;
 
 use App\Filament\Resources\AppNotifications\AppNotificationResource;
@@ -17,5 +19,14 @@ class EditAppNotification extends EditRecord
             ViewAction::make(),
             DeleteAction::make(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        return CreateAppNotification::sanitizeNotificationFormData($data);
     }
 }
