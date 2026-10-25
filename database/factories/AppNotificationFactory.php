@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\NotificationActionType;
 use App\Enums\NotificationStatus;
+use App\Enums\NotificationTargetType;
+use App\Enums\NotificationType;
 use App\Models\AppNotification;
 use App\Models\ClientApp;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -20,12 +23,18 @@ class AppNotificationFactory extends Factory
     {
         return [
             'client_app_id' => ClientApp::factory(),
+            'type' => fake()->randomElement(NotificationType::cases()),
             'title' => fake()->sentence(4),
             'body' => fake()->paragraph(2),
-            'payload_data' => ['screen' => 'home'],
+            'action_type' => NotificationActionType::OpenApp,
+            'action_value' => null,
+            'payload_data' => ['source' => 'factory'],
             'status' => NotificationStatus::PENDING,
+            'target_type' => NotificationTargetType::AllDevices,
             'target_os' => null,
             'topic' => null,
+            'target_app_versions' => null,
+            'target_device_ids' => null,
             'sent_count' => 0,
             'failed_count' => 0,
             'delivered_count' => 0,
