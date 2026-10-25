@@ -24,8 +24,8 @@ class FirebasePushService implements PushNotificationServiceInterface
      */
     public function sendToToken(
         string $token,
-        string $title,
-        string $body,
+        ?string $title,
+        ?string $body,
         array $data = [],
         ?string $imageUrl = null
     ): PushDeliveryResultDTO {
@@ -37,8 +37,8 @@ class FirebasePushService implements PushNotificationServiceInterface
      */
     public function sendMulticast(
         array $tokens,
-        string $title,
-        string $body,
+        ?string $title,
+        ?string $body,
         array $data = [],
         ?string $imageUrl = null
     ): PushDeliveryResultDTO {
@@ -49,11 +49,14 @@ class FirebasePushService implements PushNotificationServiceInterface
         }
 
         try {
-            $notification = Notification::create($title, $body, $imageUrl);
-
             $message = CloudMessage::new()
-                ->withNotification($notification)
                 ->withData($this->sanitizePayloadData($data));
+
+            if ($this->shouldAttachNotificationBlock($title, $body)) {
+                $message = $message->withNotification(
+                    Notification::create((string) $title, (string) $body, $imageUrl)
+                );
+            }
 
             $report = $this->messaging->sendMulticast($message, $validTokens);
 
@@ -95,18 +98,21 @@ class FirebasePushService implements PushNotificationServiceInterface
      */
     public function sendToTopic(
         string $topic,
-        string $title,
-        string $body,
+        ?string $title,
+        ?string $body,
         array $data = [],
         ?string $imageUrl = null
     ): PushDeliveryResultDTO {
         try {
-            $notification = Notification::create($title, $body, $imageUrl);
-
             $message = CloudMessage::new()
                 ->withTopic($topic)
-                ->withNotification($notification)
                 ->withData($this->sanitizePayloadData($data));
+
+            if ($this->shouldAttachNotificationBlock($title, $body)) {
+                $message = $message->withNotification(
+                    Notification::create((string) $title, (string) $body, $imageUrl)
+                );
+            }
 
             $this->messaging->send($message);
 
@@ -169,6 +175,15 @@ class FirebasePushService implements PushNotificationServiceInterface
 
             return false;
         }
+    }
+
+    /**
+     * التحقق مما إذا كان الإشعار مرئياً ويحتاج إلى Notification Block أم صامتاً (Data-Only).
+     */
+    private function shouldAttachNotificationBlock(?string $title, ?string $body): bool
+    {
+        return ($title !== null && trim($title) !== '')
+            || ($body !== null && trim($body) !== '');
     }
 
     /**

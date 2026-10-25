@@ -9,41 +9,47 @@ use App\DTOs\PushDeliveryResultDTO;
 interface PushNotificationServiceInterface
 {
     /**
-     * @param  array<string, string>  $data
+     * إرسال إشعار لجهاز واحد عبر FCM Token.
+     *
+     * @param  array<string, mixed>  $data
      */
     public function sendToToken(
         string $token,
-        string $title,
-        string $body,
+        ?string $title,
+        ?string $body,
         array $data = [],
         ?string $imageUrl = null
     ): PushDeliveryResultDTO;
 
     /**
+     * إرسال إشعار لمجموعة أجهزة (Multicast).
+     *
      * @param  array<int, string>  $tokens
-     * @param  array<string, string>  $data
+     * @param  array<string, mixed>  $data
      */
     public function sendMulticast(
         array $tokens,
-        string $title,
-        string $body,
+        ?string $title,
+        ?string $body,
         array $data = [],
         ?string $imageUrl = null
     ): PushDeliveryResultDTO;
 
     /**
-     * @param  array<string, string>  $data
+     * إرسال إشعار لموضوع محدد (Firebase Topic).
+     *
+     * @param  array<string, mixed>  $data
      */
     public function sendToTopic(
         string $topic,
-        string $title,
-        string $body,
+        ?string $title,
+        ?string $body,
         array $data = [],
         ?string $imageUrl = null
     ): PushDeliveryResultDTO;
 
     /**
-     * اشتراك توكن (أو مجموعة توكنات) في عدة مواضيع على Firebase.
+     * اشتراك أجهزة في مجموعة مواضيع.
      *
      * @param  array<int, string>  $topics
      * @param  array<int, string>|string  $tokens
@@ -51,7 +57,7 @@ interface PushNotificationServiceInterface
     public function subscribeToTopics(array $topics, array|string $tokens): bool;
 
     /**
-     * إلغاء اشتراك توكن (أو مجموعة توكنات) من عدة مواضيع على Firebase.
+     * إلغاء اشتراك أجهزة من مجموعة مواضيع.
      *
      * @param  array<int, string>  $topics
      * @param  array<int, string>|string  $tokens

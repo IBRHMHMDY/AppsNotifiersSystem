@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Contracts\PushNotificationServiceInterface;
+use App\Enums\NotificationActionType;
 use App\Enums\NotificationStatus;
+use App\Enums\NotificationTargetType;
+use App\Enums\NotificationType;
 use App\Models\AppNotification;
 use App\Models\Device;
+use App\Services\TargetAudienceService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,8 +37,10 @@ class ProcessAppNotificationJob implements ShouldQueue
     /**
      * تنفيذ إرسال الإشعار (سواء عبر Topic أو عبر دفعات Multicast 500 جهاز).
      */
-    public function handle(PushNotificationServiceInterface $pushService): void
-    {
+    public function handle(
+        PushNotificationServiceInterface $pushService,
+        TargetAudienceService $audienceService
+    ): void {
         $notification = $this->appNotification->fresh(['clientApp', 'media']);
 
         if (! $notification) {
@@ -48,21 +54,33 @@ class ProcessAppNotificationJob implements ShouldQueue
             return;
         }
 
-        $imageUrl = $notification->getFirstMediaUrl('notification_image') ?: null;
+        $notificationType = $notification->type ?? NotificationType::General;
+        $targetType = $notification->target_type ?? NotificationTargetType::AllDevices;
+        $actionType = $notification->action_type ?? NotificationActionType::OpenApp;
+
+        $isSilent = $notificationType->isSilent();
+        $title = $isSilent ? null : (string) $notification->title;
+        $body = $isSilent ? null : (string) $notification->body;
+        $imageUrl = $isSilent ? null : ($notification->getFirstMediaUrl('notification_image') ?: null);
 
         $customData = is_array($notification->payload_data) ? $notification->payload_data : [];
         $payload = array_merge($customData, [
             'notification_id' => (string) $notification->id,
             'client_app_id' => (string) ($notification->client_app_id ?? 'all'),
+            'notification_type' => $notificationType->value,
+            'action_type' => $actionType->value,
+            'action_value' => (string) ($notification->action_value ?? ''),
             'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
         ]);
 
-        // المسار الأول: إذا كان الإشعار موجهاً إلى موضوع (Firebase Topic)
-        if (! empty($notification->topic)) {
+        // المسار الأول: إذا كان الاستهداف موجهاً إلى موضوع (Firebase Topic)
+        $isTopicTarget = $targetType === NotificationTargetType::Topic || ! empty($notification->topic);
+
+        if ($isTopicTarget && ! empty($notification->topic)) {
             $result = $pushService->sendToTopic(
-                topic: (string) $notification->topic,
-                title: (string) $notification->title,
-                body: (string) $notification->body,
+                topic: trim((string) $notification->topic),
+                title: $title,
+                body: $body,
                 data: $payload,
                 imageUrl: $imageUrl,
             );
@@ -77,25 +95,17 @@ class ProcessAppNotificationJob implements ShouldQueue
             return;
         }
 
-        // المسار الثاني: الإرسال المجمع (Batch Multicast) للأجهزة المستهدفة (500 جهاز في كل دفعة)
+        // المسار الثاني: الإرسال المجمع (Batch Multicast) للأجهزة المستهدفة حسب الفلترة (500 جهاز في كل دفعة)
         $totalSuccess = 0;
         $totalFailure = 0;
         $invalidTokensToClean = [];
 
-        Device::query()
-            ->whereNotNull('fcm_token')
-            ->when(
-                $notification->client_app_id !== null,
-                fn (Builder $q) => $q->where('client_app_id', $notification->client_app_id),
-                fn (Builder $q) => $q->whereHas('clientApp', fn (Builder $appQuery) => $appQuery->where('is_active', true))
-            )
-            ->when(
-                $notification->target_os !== null,
-                fn (Builder $q) => $q->where('os_type', $notification->target_os)
-            )
+        $audienceService
+            ->buildQueryForNotification($notification)
             ->chunkById(500, function (Collection $devices) use (
                 $pushService,
-                $notification,
+                $title,
+                $body,
                 $payload,
                 $imageUrl,
                 &$totalSuccess,
@@ -107,8 +117,8 @@ class ProcessAppNotificationJob implements ShouldQueue
 
                 $result = $pushService->sendMulticast(
                     tokens: $tokens,
-                    title: (string) $notification->title,
-                    body: (string) $notification->body,
+                    title: $title,
+                    body: $body,
                     data: $payload,
                     imageUrl: $imageUrl,
                 );
@@ -127,7 +137,7 @@ class ProcessAppNotificationJob implements ShouldQueue
                 Device::query()
                     ->when(
                         $notification->client_app_id !== null,
-                        fn (Builder $q) => $q->where('client_app_id', $notification->client_app_id)
+                        fn (Builder $q): Builder => $q->where('client_app_id', $notification->client_app_id)
                     )
                     ->whereIn('fcm_token', $tokenChunk)
                     ->delete();
