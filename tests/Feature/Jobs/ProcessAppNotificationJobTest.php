@@ -6,11 +6,16 @@ namespace Tests\Feature\Jobs;
 
 use App\Contracts\PushNotificationServiceInterface;
 use App\DTOs\PushDeliveryResultDTO;
+use App\Enums\NotificationActionType;
 use App\Enums\NotificationStatus;
+use App\Enums\NotificationTargetType;
+use App\Enums\NotificationType;
+use App\Enums\OsType;
 use App\Jobs\ProcessAppNotificationJob;
 use App\Models\AppNotification;
 use App\Models\ClientApp;
 use App\Models\Device;
+use App\Services\TargetAudienceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\TestCase;
@@ -21,7 +26,7 @@ class ProcessAppNotificationJobTest extends TestCase
 
     public function test_it_sends_multicast_batches_updates_metrics_and_cleans_invalid_tokens(): void
     {
-        $app = ClientApp::factory()->create();
+        $app = ClientApp::factory()->create(['is_active' => true]);
 
         $validDevice = Device::factory()->create([
             'client_app_id' => $app->id,
@@ -35,6 +40,8 @@ class ProcessAppNotificationJobTest extends TestCase
 
         $notification = AppNotification::factory()->create([
             'client_app_id' => $app->id,
+            'type' => NotificationType::Promotional,
+            'target_type' => NotificationTargetType::AllDevices,
             'title' => 'عرض خاص',
             'body' => 'خصم 50% اليوم فقط',
             'status' => NotificationStatus::PROCESSING,
@@ -52,7 +59,7 @@ class ProcessAppNotificationJobTest extends TestCase
         });
 
         $job = new ProcessAppNotificationJob($notification);
-        $job->handle($pushServiceMock);
+        $job->handle($pushServiceMock, app(TargetAudienceService::class));
 
         $notification->refresh();
 
@@ -64,5 +71,169 @@ class ProcessAppNotificationJobTest extends TestCase
         // التأكد من بقاء الجهاز الصالح وحذف الجهاز صاحب التوكن المنتهي تلقائياً
         $this->assertDatabaseHas('devices', ['id' => $validDevice->id]);
         $this->assertDatabaseMissing('devices', ['id' => $expiredDevice->id]);
+    }
+
+    public function test_it_filters_segmented_devices_by_os_and_app_versions(): void
+    {
+        $app = ClientApp::factory()->create(['is_active' => true]);
+
+        // جهاز مطابق للشروط (Android + v2.0.0)
+        Device::factory()->create([
+            'client_app_id' => $app->id,
+            'fcm_token' => 'matched_android_v2_token',
+            'os_type' => OsType::ANDROID,
+            'app_version' => '2.0.0',
+        ]);
+
+        // جهاز غير مطابق (إصدار قديم v1.0.0)
+        Device::factory()->create([
+            'client_app_id' => $app->id,
+            'fcm_token' => 'unmatched_android_v1_token',
+            'os_type' => OsType::ANDROID,
+            'app_version' => '1.0.0',
+        ]);
+
+        // جهاز غير مطابق (نظام iOS)
+        Device::factory()->create([
+            'client_app_id' => $app->id,
+            'fcm_token' => 'unmatched_ios_v2_token',
+            'os_type' => OsType::IOS,
+            'app_version' => '2.0.0',
+        ]);
+
+        $notification = AppNotification::factory()->create([
+            'client_app_id' => $app->id,
+            'type' => NotificationType::SystemAlert,
+            'target_type' => NotificationTargetType::Segmented,
+            'target_os' => OsType::ANDROID,
+            'target_app_versions' => ['2.0.0', '2.1.0'],
+            'action_type' => NotificationActionType::DeepLink,
+            'action_value' => '/updates/changelog',
+            'status' => NotificationStatus::PROCESSING,
+        ]);
+
+        $pushServiceMock = $this->mock(PushNotificationServiceInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('sendMulticast')
+                ->once()
+                ->withArgs(function (array $tokens, ?string $title, ?string $body, array $data): bool {
+                    return $tokens === ['matched_android_v2_token']
+                        && $data['notification_type'] === NotificationType::SystemAlert->value
+                        && $data['action_type'] === NotificationActionType::DeepLink->value
+                        && $data['action_value'] === '/updates/changelog';
+                })
+                ->andReturn(new PushDeliveryResultDTO(successCount: 1, failureCount: 0));
+        });
+
+        $job = new ProcessAppNotificationJob($notification);
+        $job->handle($pushServiceMock, app(TargetAudienceService::class));
+
+        $notification->refresh();
+        $this->assertSame(NotificationStatus::SENT, $notification->status);
+        $this->assertSame(1, $notification->sent_count);
+    }
+
+    public function test_it_targets_only_specific_device_ids_when_specific_devices_target_type_is_selected(): void
+    {
+        $app = ClientApp::factory()->create(['is_active' => true]);
+
+        $targetDevice = Device::factory()->create([
+            'client_app_id' => $app->id,
+            'fcm_token' => 'specific_target_token',
+        ]);
+
+        Device::factory()->create([
+            'client_app_id' => $app->id,
+            'fcm_token' => 'other_ignored_token',
+        ]);
+
+        $notification = AppNotification::factory()->create([
+            'client_app_id' => $app->id,
+            'type' => NotificationType::Transactional,
+            'target_type' => NotificationTargetType::SpecificDevices,
+            'target_device_ids' => [$targetDevice->id],
+            'status' => NotificationStatus::PROCESSING,
+        ]);
+
+        $pushServiceMock = $this->mock(PushNotificationServiceInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('sendMulticast')
+                ->once()
+                ->withArgs(fn (array $tokens): bool => $tokens === ['specific_target_token'])
+                ->andReturn(new PushDeliveryResultDTO(successCount: 1, failureCount: 0));
+        });
+
+        $job = new ProcessAppNotificationJob($notification);
+        $job->handle($pushServiceMock, app(TargetAudienceService::class));
+
+        $notification->refresh();
+        $this->assertSame(NotificationStatus::SENT, $notification->status);
+        $this->assertSame(1, $notification->sent_count);
+    }
+
+    public function test_it_sends_silent_data_notification_without_title_or_body(): void
+    {
+        $app = ClientApp::factory()->create(['is_active' => true]);
+
+        Device::factory()->create([
+            'client_app_id' => $app->id,
+            'fcm_token' => 'silent_target_token',
+        ]);
+
+        $notification = AppNotification::factory()->create([
+            'client_app_id' => $app->id,
+            'type' => NotificationType::SilentData,
+            'target_type' => NotificationTargetType::AllDevices,
+            'title' => null,
+            'body' => null,
+            'payload_data' => ['sync_config' => 'true'],
+            'status' => NotificationStatus::PROCESSING,
+        ]);
+
+        $pushServiceMock = $this->mock(PushNotificationServiceInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('sendMulticast')
+                ->once()
+                ->withArgs(function (array $tokens, ?string $title, ?string $body, array $data): bool {
+                    return $tokens === ['silent_target_token']
+                        && $title === null
+                        && $body === null
+                        && $data['sync_config'] === 'true'
+                        && $data['notification_type'] === NotificationType::SilentData->value;
+                })
+                ->andReturn(new PushDeliveryResultDTO(successCount: 1, failureCount: 0));
+        });
+
+        $job = new ProcessAppNotificationJob($notification);
+        $job->handle($pushServiceMock, app(TargetAudienceService::class));
+
+        $notification->refresh();
+        $this->assertSame(NotificationStatus::SENT, $notification->status);
+    }
+
+    public function test_it_dispatches_to_fcm_topic_when_topic_target_type_is_used(): void
+    {
+        $app = ClientApp::factory()->create(['is_active' => true]);
+
+        $notification = AppNotification::factory()->create([
+            'client_app_id' => $app->id,
+            'type' => NotificationType::General,
+            'target_type' => NotificationTargetType::Topic,
+            'topic' => 'vip_offers',
+            'title' => 'عرض VIP',
+            'body' => 'حصري للمشتركين',
+            'status' => NotificationStatus::PROCESSING,
+        ]);
+
+        $pushServiceMock = $this->mock(PushNotificationServiceInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('sendToTopic')
+                ->once()
+                ->withArgs(fn (string $topic, ?string $title): bool => $topic === 'vip_offers' && $title === 'عرض VIP')
+                ->andReturn(new PushDeliveryResultDTO(successCount: 1, failureCount: 0));
+        });
+
+        $job = new ProcessAppNotificationJob($notification);
+        $job->handle($pushServiceMock, app(TargetAudienceService::class));
+
+        $notification->refresh();
+        $this->assertSame(NotificationStatus::SENT, $notification->status);
+        $this->assertSame(1, $notification->sent_count);
     }
 }

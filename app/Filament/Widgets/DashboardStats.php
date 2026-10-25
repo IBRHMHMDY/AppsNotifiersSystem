@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Widgets;
 
 use App\Enums\NotificationStatus;
+use App\Enums\NotificationType;
 use App\Models\AppNotification;
 use App\Models\ClientApp;
 use App\Models\Device;
@@ -39,6 +40,21 @@ class DashboardStats extends BaseWidget
             ->whereIn('status', [NotificationStatus::PENDING, NotificationStatus::PROCESSING])
             ->count();
 
+        // حساب إجمالي الرسائل المرسلة للأجهزة ومعدل الفتح والنقر
+        $metrics = AppNotification::query()
+            ->where('status', NotificationStatus::SENT)
+            ->where('type', '!=', NotificationType::SilentData)
+            ->selectRaw('COALESCE(SUM(sent_count), 0) as total_sent, COALESCE(SUM(opened_count), 0) as total_opened, COALESCE(SUM(clicked_count), 0) as total_clicked')
+            ->first();
+
+        $totalSentMessages = (int) ($metrics->total_sent ?? 0);
+        $totalOpenedMessages = (int) ($metrics->total_opened ?? 0);
+        $totalClickedMessages = (int) ($metrics->total_clicked ?? 0);
+
+        $overallCtr = $totalSentMessages > 0
+            ? round(($totalOpenedMessages / $totalSentMessages) * 100, 1)
+            : 0.0;
+
         return [
             Stat::make('إجمالي التطبيقات', (string) $totalApps)
                 ->description("منها {$activeApps} تطبيق نشط حالياً")
@@ -52,7 +68,7 @@ class DashboardStats extends BaseWidget
                 ->color('success')
                 ->chart($this->getLastSevenDaysTrend(Device::query())),
 
-            Stat::make('الإشعارات المرسلة', number_format($sentNotifications))
+            Stat::make('حملات الإشعارات المرسلة', number_format($sentNotifications))
                 ->description("معلق: {$pendingNotifications} | فاشل: {$failedNotifications}")
                 ->descriptionIcon('heroicon-m-paper-airplane')
                 ->color($failedNotifications > 0 ? 'warning' : 'info')
@@ -60,6 +76,11 @@ class DashboardStats extends BaseWidget
                     AppNotification::query()->where('status', NotificationStatus::SENT),
                     'sent_at'
                 )),
+
+            Stat::make('معدل التفاعل والفتح (CTR)', "{$overallCtr}%")
+                ->description("فتح: " . number_format($totalOpenedMessages) . " | نقر: " . number_format($totalClickedMessages))
+                ->descriptionIcon('heroicon-m-cursor-arrow-rays')
+                ->color($overallCtr >= 10.0 ? 'success' : 'primary'),
         ];
     }
 
