@@ -111,16 +111,16 @@ class AppNotification extends Model implements HasMedia
                 ? "كل أجهزة ({$this->clientApp->name})"
                 : 'كل التطبيقات والأجهزة (بث عام)',
 
-            NotificationTargetType::Topic => 'الموضوع: #' . ($this->topic ?: 'غير محدد'),
+            NotificationTargetType::Topic => 'الموضوع: #'.($this->topic ?: 'غير محدد'),
 
             NotificationTargetType::Segmented => collect([
                 $this->target_os ? "النظام: {$this->target_os->getLabel()}" : 'كل الأنظمة',
                 ! empty($this->target_app_versions)
-                    ? 'الإصدارات: ' . implode(', ', $this->target_app_versions)
+                    ? 'الإصدارات: '.implode(', ', $this->target_app_versions)
                     : null,
             ])->filter()->implode(' • '),
 
-            NotificationTargetType::SpecificDevices => 'عدد الأجهزة المحددة: ' . count($this->target_device_ids ?? []),
+            NotificationTargetType::SpecificDevices => 'عدد الأجهزة المحددة: '.count($this->target_device_ids ?? []),
 
             default => 'غير محدد',
         };

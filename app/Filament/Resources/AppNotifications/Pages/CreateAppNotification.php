@@ -39,7 +39,7 @@ class CreateAppNotification extends CreateRecord
         if ($notification->scheduled_at !== null && $notification->scheduled_at->isFuture()) {
             Notification::make()
                 ->title('تمت جدولة الإشعار بنجاح')
-                ->body('سيتم إرسال الإشعار تلقائياً في: ' . $notification->scheduled_at->format('Y-m-d h:i A'))
+                ->body('سيتم إرسال الإشعار تلقائياً في: '.$notification->scheduled_at->format('Y-m-d h:i A'))
                 ->info()
                 ->send();
 

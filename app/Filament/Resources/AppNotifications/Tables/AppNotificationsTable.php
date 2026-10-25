@@ -45,7 +45,7 @@ class AppNotificationsTable
                         ? 'مزامنة صامتة (Silent Payload)'
                         : ($record->title ?: 'بدون عنوان'))
                     ->description(fn (AppNotification $record): string => $record->type?->isSilent()
-                        ? 'المفاتيح: ' . implode(', ', array_keys($record->payload_data ?? []))
+                        ? 'المفاتيح: '.implode(', ', array_keys($record->payload_data ?? []))
                         : Str::limit((string) $record->body, 45))
                     ->wrap(),
 
@@ -89,7 +89,7 @@ class AppNotificationsTable
                         }
                         $ctr = ($record->opened_count / $record->sent_count) * 100;
 
-                        return round($ctr, 1) . '%';
+                        return round($ctr, 1).'%';
                     })
                     ->description(fn (AppNotification $record): string => "فتح: {$record->opened_count} • نقر: {$record->clicked_count}")
                     ->badge()
@@ -100,7 +100,7 @@ class AppNotificationsTable
                     ->dateTime('Y-m-d h:i A')
                     ->placeholder('إرسال فوري')
                     ->description(fn (AppNotification $record): string => $record->sent_at
-                        ? 'أُرسل: ' . $record->sent_at->format('Y-m-d h:i A')
+                        ? 'أُرسل: '.$record->sent_at->format('Y-m-d h:i A')
                         : 'لم يُرسل بعد')
                     ->sortable(),
             ])
@@ -136,8 +136,8 @@ class AppNotificationsTable
                     ->requiresConfirmation()
                     ->modalHeading('تأكيد الإرسال الفوري')
                     ->modalDescription(fn (AppNotification $record): string => $record->scheduled_at !== null && $record->scheduled_at->isFuture()
-                        ? 'هذا الإشعار مجدول للإرسال في (' . $record->scheduled_at->format('Y-m-d h:i A') . '). هل تريد تجاوز الجدولة وإرساله الآن فوراً؟'
-                        : 'هل أنت متأكد من إرسال هذا الإشعار الآن للجمهور المستهدف (' . $record->target_summary . ')؟'
+                        ? 'هذا الإشعار مجدول للإرسال في ('.$record->scheduled_at->format('Y-m-d h:i A').'). هل تريد تجاوز الجدولة وإرساله الآن فوراً؟'
+                        : 'هل أنت متأكد من إرسال هذا الإشعار الآن للجمهور المستهدف ('.$record->target_summary.')؟'
                     )
                     ->modalSubmitActionLabel('نعم، أرسل الآن')
                     ->visible(fn (AppNotification $record): bool => in_array($record->status, [

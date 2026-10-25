@@ -31,15 +31,15 @@ class NotificationsTimelineChart extends ChartWidget
     {
         return [
             'all' => 'جميع الإشعارات',
-            'type:' . NotificationType::General->value => 'النوع: ' . NotificationType::General->getLabel(),
-            'type:' . NotificationType::Promotional->value => 'النوع: ' . NotificationType::Promotional->getLabel(),
-            'type:' . NotificationType::Transactional->value => 'النوع: ' . NotificationType::Transactional->getLabel(),
-            'type:' . NotificationType::SystemAlert->value => 'النوع: ' . NotificationType::SystemAlert->getLabel(),
-            'type:' . NotificationType::SilentData->value => 'النوع: ' . NotificationType::SilentData->getLabel(),
-            'target:' . NotificationTargetType::AllDevices->value => 'الاستهداف: ' . NotificationTargetType::AllDevices->getLabel(),
-            'target:' . NotificationTargetType::Topic->value => 'الاستهداف: ' . NotificationTargetType::Topic->getLabel(),
-            'target:' . NotificationTargetType::Segmented->value => 'الاستهداف: ' . NotificationTargetType::Segmented->getLabel(),
-            'target:' . NotificationTargetType::SpecificDevices->value => 'الاستهداف: ' . NotificationTargetType::SpecificDevices->getLabel(),
+            'type:'.NotificationType::General->value => 'النوع: '.NotificationType::General->getLabel(),
+            'type:'.NotificationType::Promotional->value => 'النوع: '.NotificationType::Promotional->getLabel(),
+            'type:'.NotificationType::Transactional->value => 'النوع: '.NotificationType::Transactional->getLabel(),
+            'type:'.NotificationType::SystemAlert->value => 'النوع: '.NotificationType::SystemAlert->getLabel(),
+            'type:'.NotificationType::SilentData->value => 'النوع: '.NotificationType::SilentData->getLabel(),
+            'target:'.NotificationTargetType::AllDevices->value => 'الاستهداف: '.NotificationTargetType::AllDevices->getLabel(),
+            'target:'.NotificationTargetType::Topic->value => 'الاستهداف: '.NotificationTargetType::Topic->getLabel(),
+            'target:'.NotificationTargetType::Segmented->value => 'الاستهداف: '.NotificationTargetType::Segmented->getLabel(),
+            'target:'.NotificationTargetType::SpecificDevices->value => 'الاستهداف: '.NotificationTargetType::SpecificDevices->getLabel(),
         ];
     }
 

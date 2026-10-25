@@ -117,7 +117,7 @@ class AppNotificationInfolist
                                     return '0%';
                                 }
 
-                                return round(($record->opened_count / $record->sent_count) * 100, 2) . '%';
+                                return round(($record->opened_count / $record->sent_count) * 100, 2).'%';
                             })
                             ->badge()
                             ->color('success'),

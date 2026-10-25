@@ -78,7 +78,7 @@ class DashboardStats extends BaseWidget
                 )),
 
             Stat::make('معدل التفاعل والفتح (CTR)', "{$overallCtr}%")
-                ->description("فتح: " . number_format($totalOpenedMessages) . " | نقر: " . number_format($totalClickedMessages))
+                ->description('فتح: '.number_format($totalOpenedMessages).' | نقر: '.number_format($totalClickedMessages))
                 ->descriptionIcon('heroicon-m-cursor-arrow-rays')
                 ->color($overallCtr >= 10.0 ? 'success' : 'primary'),
         ];
