@@ -13,20 +13,33 @@ use App\Models\AppNotification;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 class AppNotificationResource extends Resource
 {
     protected static ?string $model = AppNotification::class;
 
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-bell-alert';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
+
+    protected static string|UnitEnum|null $navigationGroup = 'الإشعارات';
 
     protected static ?string $navigationLabel = 'الإشعارات';
 
     protected static ?string $modelLabel = 'إشعار';
 
-    protected static string|UnitEnum|null $navigationGroup = 'التواصل';
+    protected static ?string $pluralModelLabel = 'الإشعارات';
+
+    protected static ?int $navigationSort = 1;
+
+    protected static ?string $recordTitleAttribute = 'title';
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->with(['clientApp']);
+    }
 
     public static function form(Schema $schema): Schema
     {

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Updates\EvaluateAppUpdateAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\CheckUpdateRequest;
-use App\Http\Resources\Api\AppUpdateResource;
+use App\Http\Requests\Api\V1\CheckUpdateRequest;
+use App\Http\Resources\Api\V1\AppUpdateResource;
 use Illuminate\Http\JsonResponse;
 
 class CheckUpdateController extends Controller

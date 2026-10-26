@@ -1,5 +1,9 @@
 <?php
 
+// app/Filament/Resources/AppUpdates/AppUpdateResource.php
+
+declare(strict_types=1);
+
 namespace App\Filament\Resources\AppUpdates;
 
 use App\Filament\Resources\AppUpdates\Pages\CreateAppUpdate;
@@ -13,20 +17,33 @@ use App\Models\AppUpdate;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 class AppUpdateResource extends Resource
 {
     protected static ?string $model = AppUpdate::class;
 
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowUpCircle;
+
+    protected static string|UnitEnum|null $navigationGroup = 'إدارة النظام';
 
     protected static ?string $navigationLabel = 'تحديثات التطبيقات';
 
     protected static ?string $modelLabel = 'تحديث';
 
-    protected static string|UnitEnum|null $navigationGroup = 'إدارة النظام';
+    protected static ?string $pluralModelLabel = 'تحديثات التطبيقات';
+
+    protected static ?int $navigationSort = 2;
+
+    protected static ?string $recordTitleAttribute = 'version';
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->with(['clientApp']);
+    }
 
     public static function form(Schema $schema): Schema
     {
