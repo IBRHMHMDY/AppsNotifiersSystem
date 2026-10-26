@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Devices\RegisterDeviceAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\SyncDeviceRequest;
-use App\Http\Resources\Api\DeviceResource;
+use App\Http\Requests\Api\V1\SyncDeviceRequest;
+use App\Http\Resources\Api\V1\DeviceResource;
 use Illuminate\Http\JsonResponse;
 
 class SyncDeviceController extends Controller

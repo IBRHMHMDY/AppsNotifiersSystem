@@ -33,6 +33,15 @@ class ClientAppResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'إدارة النظام';
 
+    protected static ?int $navigationSort = 1;
+
+    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->withCount(['devices', 'notifications', 'updates']);
+    }
+
     public static function form(Schema $schema): Schema
     {
         return ClientAppForm::configure($schema);

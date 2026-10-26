@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Notifications\TrackNotificationAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\TrackNotificationRequest;
+use App\Http\Requests\Api\V1\TrackNotificationRequest;
 use Illuminate\Http\JsonResponse;
 
 class TrackNotificationController extends Controller
