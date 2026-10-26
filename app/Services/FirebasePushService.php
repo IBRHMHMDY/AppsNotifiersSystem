@@ -1,20 +1,31 @@
 <?php
 
+// app/Services/FirebasePushService.php
+
 declare(strict_types=1);
 
 namespace App\Services;
 
 use App\Contracts\PushNotificationServiceInterface;
 use App\DTOs\PushDeliveryResultDTO;
+use App\Models\ClientApp;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Exception\MessagingException;
+use Kreait\Firebase\Factory;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
 use Throwable;
 
 class FirebasePushService implements PushNotificationServiceInterface
 {
+    /**
+     * تخزين مؤقت لاتصالات Firebase المخصصة لكل تطبيق خلال دورة حياة الـ Worker.
+     *
+     * @var array<int, Messaging>
+     */
+    private array $customMessagingInstances = [];
+
     public function __construct(
         private readonly Messaging $messaging
     ) {}
@@ -27,9 +38,10 @@ class FirebasePushService implements PushNotificationServiceInterface
         ?string $title,
         ?string $body,
         array $data = [],
-        ?string $imageUrl = null
+        ?string $imageUrl = null,
+        ?ClientApp $clientApp = null
     ): PushDeliveryResultDTO {
-        return $this->sendMulticast([$token], $title, $body, $data, $imageUrl);
+        return $this->sendMulticast([$token], $title, $body, $data, $imageUrl, $clientApp);
     }
 
     /**
@@ -40,7 +52,8 @@ class FirebasePushService implements PushNotificationServiceInterface
         ?string $title,
         ?string $body,
         array $data = [],
-        ?string $imageUrl = null
+        ?string $imageUrl = null,
+        ?ClientApp $clientApp = null
     ): PushDeliveryResultDTO {
         $validTokens = array_values(array_filter(array_unique($tokens)));
 
@@ -49,6 +62,8 @@ class FirebasePushService implements PushNotificationServiceInterface
         }
 
         try {
+            $messaging = $this->resolveMessaging($clientApp);
+
             $message = CloudMessage::new()
                 ->withData($this->sanitizePayloadData($data));
 
@@ -58,7 +73,7 @@ class FirebasePushService implements PushNotificationServiceInterface
                 );
             }
 
-            $report = $this->messaging->sendMulticast($message, $validTokens);
+            $report = $messaging->sendMulticast($message, $validTokens);
 
             $invalidTokens = array_values(array_unique(array_merge(
                 $report->unknownTokens(),
@@ -80,6 +95,7 @@ class FirebasePushService implements PushNotificationServiceInterface
             );
         } catch (MessagingException|Throwable $e) {
             Log::error('Firebase Multicast Push Error: '.$e->getMessage(), [
+                'client_app_id' => $clientApp?->id,
                 'tokens_count' => count($validTokens),
                 'exception' => $e,
             ]);
@@ -101,9 +117,12 @@ class FirebasePushService implements PushNotificationServiceInterface
         ?string $title,
         ?string $body,
         array $data = [],
-        ?string $imageUrl = null
+        ?string $imageUrl = null,
+        ?ClientApp $clientApp = null
     ): PushDeliveryResultDTO {
         try {
+            $messaging = $this->resolveMessaging($clientApp);
+
             $message = CloudMessage::new()
                 ->withTopic($topic)
                 ->withData($this->sanitizePayloadData($data));
@@ -114,11 +133,12 @@ class FirebasePushService implements PushNotificationServiceInterface
                 );
             }
 
-            $this->messaging->send($message);
+            $messaging->send($message);
 
             return new PushDeliveryResultDTO(successCount: 1, failureCount: 0);
         } catch (MessagingException|Throwable $e) {
             Log::error('Firebase Topic Push Error: '.$e->getMessage(), [
+                'client_app_id' => $clientApp?->id,
                 'topic' => $topic,
                 'exception' => $e,
             ]);
@@ -134,19 +154,23 @@ class FirebasePushService implements PushNotificationServiceInterface
     /**
      * {@inheritDoc}
      */
-    public function subscribeToTopics(array $topics, array|string $tokens): bool
-    {
+    public function subscribeToTopics(
+        array $topics,
+        array|string $tokens,
+        ?ClientApp $clientApp = null
+    ): bool {
         $cleanTopics = array_values(array_filter(array_unique($topics)));
         if ($cleanTopics === []) {
             return true;
         }
 
         try {
-            $this->messaging->subscribeToTopics($cleanTopics, $tokens);
+            $this->resolveMessaging($clientApp)->subscribeToTopics($cleanTopics, $tokens);
 
             return true;
         } catch (MessagingException|Throwable $e) {
             Log::warning('Firebase Subscribe To Topics Error: '.$e->getMessage(), [
+                'client_app_id' => $clientApp?->id,
                 'topics' => $cleanTopics,
             ]);
 
@@ -157,24 +181,51 @@ class FirebasePushService implements PushNotificationServiceInterface
     /**
      * {@inheritDoc}
      */
-    public function unsubscribeFromTopics(array $topics, array|string $tokens): bool
-    {
+    public function unsubscribeFromTopics(
+        array $topics,
+        array|string $tokens,
+        ?ClientApp $clientApp = null
+    ): bool {
         $cleanTopics = array_values(array_filter(array_unique($topics)));
         if ($cleanTopics === []) {
             return true;
         }
 
         try {
-            $this->messaging->unsubscribeFromTopics($cleanTopics, $tokens);
+            $this->resolveMessaging($clientApp)->unsubscribeFromTopics($cleanTopics, $tokens);
 
             return true;
         } catch (MessagingException|Throwable $e) {
             Log::warning('Firebase Unsubscribe From Topics Error: '.$e->getMessage(), [
+                'client_app_id' => $clientApp?->id,
                 'topics' => $cleanTopics,
             ]);
 
             return false;
         }
+    }
+
+    /**
+     * اختيار كائن Messaging المناسب (الخاص بالتطبيق إن وُجد، أو الافتراضي للنظام).
+     */
+    private function resolveMessaging(?ClientApp $clientApp): Messaging
+    {
+        if (! $clientApp instanceof ClientApp || ! $clientApp->hasCustomFirebaseCredentials()) {
+            return $this->messaging;
+        }
+
+        $appId = (int) $clientApp->id;
+
+        if (! isset($this->customMessagingInstances[$appId])) {
+            /** @var array<string, mixed> $credentials */
+            $credentials = $clientApp->firebase_credentials;
+
+            $this->customMessagingInstances[$appId] = (new Factory)
+                ->withServiceAccount($credentials)
+                ->createMessaging();
+        }
+
+        return $this->customMessagingInstances[$appId];
     }
 
     /**

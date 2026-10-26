@@ -1,5 +1,7 @@
 <?php
 
+// app/Jobs/ProcessAppNotificationJob.php
+
 declare(strict_types=1);
 
 namespace App\Jobs;
@@ -10,6 +12,7 @@ use App\Enums\NotificationStatus;
 use App\Enums\NotificationTargetType;
 use App\Enums\NotificationType;
 use App\Models\AppNotification;
+use App\Models\ClientApp;
 use App\Models\Device;
 use App\Services\TargetAudienceService;
 use Illuminate\Bus\Queueable;
@@ -43,7 +46,7 @@ class ProcessAppNotificationJob implements ShouldQueue
     ): void {
         $notification = $this->appNotification->fresh(['clientApp', 'media']);
 
-        if (! $notification) {
+        if (! $notification || $notification->status === NotificationStatus::SENT) {
             return;
         }
 
@@ -52,6 +55,10 @@ class ProcessAppNotificationJob implements ShouldQueue
             $notification->update(['status' => NotificationStatus::FAILED]);
 
             return;
+        }
+
+        if ($notification->status !== NotificationStatus::PROCESSING) {
+            $notification->update(['status' => NotificationStatus::PROCESSING]);
         }
 
         $notificationType = $notification->type ?? NotificationType::General;
@@ -77,20 +84,15 @@ class ProcessAppNotificationJob implements ShouldQueue
         $isTopicTarget = $targetType === NotificationTargetType::Topic || ! empty($notification->topic);
 
         if ($isTopicTarget && ! empty($notification->topic)) {
-            $result = $pushService->sendToTopic(
+            $this->handleTopicDispatch(
+                notification: $notification,
+                pushService: $pushService,
                 topic: trim((string) $notification->topic),
                 title: $title,
                 body: $body,
-                data: $payload,
-                imageUrl: $imageUrl,
+                payload: $payload,
+                imageUrl: $imageUrl
             );
-
-            $notification->update([
-                'status' => $result->isCompletelySuccessful() ? NotificationStatus::SENT : NotificationStatus::FAILED,
-                'sent_count' => $result->successCount,
-                'failed_count' => $result->failureCount,
-                'sent_at' => now(),
-            ]);
 
             return;
         }
@@ -100,10 +102,19 @@ class ProcessAppNotificationJob implements ShouldQueue
         $totalFailure = 0;
         $invalidTokensToClean = [];
 
+        /** @var array<int, ClientApp> $appsMap */
+        $appsMap = ClientApp::query()
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('id')
+            ->all();
+
         $audienceService
             ->buildQueryForNotification($notification)
             ->chunkById(500, function (Collection $devices) use (
                 $pushService,
+                $notification,
+                $appsMap,
                 $title,
                 $body,
                 $payload,
@@ -112,22 +123,34 @@ class ProcessAppNotificationJob implements ShouldQueue
                 &$totalFailure,
                 &$invalidTokensToClean
             ): void {
-                /** @var array<int, string> $tokens */
-                $tokens = $devices->pluck('fcm_token')->filter()->values()->all();
+                // تجميع الأجهزة حسب التطبيق لضمان إرسال كل دفعة بحساب Firebase الخاص بتطبيقها
+                $groupedByApp = $devices->groupBy('client_app_id');
 
-                $result = $pushService->sendMulticast(
-                    tokens: $tokens,
-                    title: $title,
-                    body: $body,
-                    data: $payload,
-                    imageUrl: $imageUrl,
-                );
+                foreach ($groupedByApp as $appId => $appDevices) {
+                    /** @var array<int, string> $tokens */
+                    $tokens = $appDevices->pluck('fcm_token')->filter()->values()->all();
 
-                $totalSuccess += $result->successCount;
-                $totalFailure += $result->failureCount;
+                    if ($tokens === []) {
+                        continue;
+                    }
 
-                if ($result->invalidTokens !== []) {
-                    $invalidTokensToClean = array_merge($invalidTokensToClean, $result->invalidTokens);
+                    $targetApp = $notification->clientApp ?? ($appsMap[(int) $appId] ?? null);
+
+                    $result = $pushService->sendMulticast(
+                        tokens: $tokens,
+                        title: $title,
+                        body: $body,
+                        data: $payload,
+                        imageUrl: $imageUrl,
+                        clientApp: $targetApp,
+                    );
+
+                    $totalSuccess += $result->successCount;
+                    $totalFailure += $result->failureCount;
+
+                    if ($result->invalidTokens !== []) {
+                        $invalidTokensToClean = array_merge($invalidTokensToClean, $result->invalidTokens);
+                    }
                 }
             });
 
@@ -150,6 +173,83 @@ class ProcessAppNotificationJob implements ShouldQueue
 
         $notification->update([
             'status' => $finalStatus,
+            'sent_count' => $totalSuccess,
+            'failed_count' => $totalFailure,
+            'sent_at' => now(),
+        ]);
+    }
+
+    /**
+     * معالجة إرسال الموضوع (Topic) لتطبيق محدد أو لجميع التطبيقات النشطة.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function handleTopicDispatch(
+        AppNotification $notification,
+        PushNotificationServiceInterface $pushService,
+        string $topic,
+        ?string $title,
+        ?string $body,
+        array $payload,
+        ?string $imageUrl
+    ): void {
+        if ($notification->client_app_id !== null) {
+            $result = $pushService->sendToTopic(
+                topic: $topic,
+                title: $title,
+                body: $body,
+                data: $payload,
+                imageUrl: $imageUrl,
+                clientApp: $notification->clientApp,
+            );
+
+            $notification->update([
+                'status' => $result->isCompletelySuccessful() ? NotificationStatus::SENT : NotificationStatus::FAILED,
+                'sent_count' => $result->successCount,
+                'failed_count' => $result->failureCount,
+                'sent_at' => now(),
+            ]);
+
+            return;
+        }
+
+        // في حالة البث العام (Broadcast Topic): نرسل للحساب الافتراضي + لأي تطبيق نشط له مشروع Firebase مستقل
+        $customApps = ClientApp::query()
+            ->where('is_active', true)
+            ->whereNotNull('firebase_project_id')
+            ->get();
+
+        $totalSuccess = 0;
+        $totalFailure = 0;
+
+        $defaultResult = $pushService->sendToTopic(
+            topic: $topic,
+            title: $title,
+            body: $body,
+            data: $payload,
+            imageUrl: $imageUrl,
+            clientApp: null,
+        );
+
+        $totalSuccess += $defaultResult->successCount;
+        $totalFailure += $defaultResult->failureCount;
+
+        foreach ($customApps as $customApp) {
+            $appResult = $pushService->sendToTopic(
+                topic: $topic,
+                title: $title,
+                body: $body,
+                data: $payload,
+                imageUrl: $imageUrl,
+                clientApp: $customApp,
+            );
+
+            $totalSuccess += $appResult->successCount;
+            $totalFailure += $appResult->failureCount;
+        }
+
+        $notification->update([
+            'status' => $totalSuccess > 0 ? NotificationStatus::SENT : NotificationStatus::FAILED,
             'sent_count' => $totalSuccess,
             'failed_count' => $totalFailure,
             'sent_at' => now(),

@@ -1,5 +1,7 @@
 <?php
 
+// app/Filament/Resources/ClientApps/Tables/ClientAppsTable.php
+
 declare(strict_types=1);
 
 namespace App\Filament\Resources\ClientApps\Tables;
@@ -41,6 +43,13 @@ class ClientAppsTable
                     ->searchable()
                     ->copyable()
                     ->fontFamily('mono'),
+
+                TextColumn::make('firebase_project_id')
+                    ->label('مشروع Firebase')
+                    ->placeholder('الافتراضي (Default)')
+                    ->badge()
+                    ->color(fn (?string $state): string => $state ? 'warning' : 'gray')
+                    ->icon('heroicon-o-fire'),
 
                 TextColumn::make('app_key')
                     ->label('App Key')

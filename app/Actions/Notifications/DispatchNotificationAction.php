@@ -1,5 +1,7 @@
 <?php
 
+// app/Actions/Notifications/DispatchNotificationAction.php
+
 declare(strict_types=1);
 
 namespace App\Actions\Notifications;
@@ -20,9 +22,13 @@ class DispatchNotificationAction
         }
 
         if ($forceNow || $notification->scheduled_at === null || $notification->scheduled_at->isPast()) {
+            $updates = ['status' => NotificationStatus::PROCESSING];
+
             if ($forceNow && $notification->scheduled_at !== null && $notification->scheduled_at->isFuture()) {
-                $notification->update(['scheduled_at' => now()]);
+                $updates['scheduled_at'] = now();
             }
+
+            $notification->update($updates);
 
             ProcessAppNotificationJob::dispatch($notification);
 

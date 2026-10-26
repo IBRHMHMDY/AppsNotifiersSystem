@@ -1,5 +1,7 @@
 <?php
 
+// app/Models/ClientApp.php
+
 declare(strict_types=1);
 
 namespace App\Models;
@@ -21,20 +23,35 @@ class ClientApp extends Model
         'name',
         'bundle_id',
         'app_key',
+        'firebase_project_id',
+        'firebase_credentials',
         'is_active',
+    ];
+
+    protected $hidden = [
+        'firebase_credentials',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'firebase_credentials' => 'encrypted:array',
     ];
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
             ->useLogName('client_apps')
-            ->logOnly(['name', 'bundle_id', 'is_active'])
+            ->logOnly(['name', 'bundle_id', 'firebase_project_id', 'is_active'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
+    }
+
+    public function hasCustomFirebaseCredentials(): bool
+    {
+        return is_array($this->firebase_credentials)
+            && ! empty($this->firebase_credentials['project_id'])
+            && ! empty($this->firebase_credentials['private_key'])
+            && ! empty($this->firebase_credentials['client_email']);
     }
 
     public static function getCacheKey(string $appKey): string
@@ -59,6 +76,14 @@ class ClientApp extends Model
         static::creating(function (ClientApp $clientApp): void {
             if (empty($clientApp->app_key)) {
                 $clientApp->app_key = Str::random(40);
+            }
+        });
+
+        static::saving(function (ClientApp $clientApp): void {
+            if (is_array($clientApp->firebase_credentials) && ! empty($clientApp->firebase_credentials['project_id'])) {
+                $clientApp->firebase_project_id = (string) $clientApp->firebase_credentials['project_id'];
+            } else {
+                $clientApp->firebase_project_id = null;
             }
         });
 

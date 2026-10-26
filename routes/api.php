@@ -1,4 +1,5 @@
 <?php
+
 // routes/api.php
 
 declare(strict_types=1);
