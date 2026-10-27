@@ -1,5 +1,7 @@
 <?php
 
+// tests/Feature/Jobs/ProcessAppNotificationJobTest.php
+
 declare(strict_types=1);
 
 namespace Tests\Feature\Jobs;
@@ -17,6 +19,7 @@ use App\Models\ClientApp;
 use App\Models\Device;
 use App\Services\TargetAudienceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -235,5 +238,31 @@ class ProcessAppNotificationJobTest extends TestCase
         $notification->refresh();
         $this->assertSame(NotificationStatus::SENT, $notification->status);
         $this->assertSame(1, $notification->sent_count);
+    }
+
+    public function test_scheduled_command_marks_due_notifications_as_processing_to_prevent_duplicate_dispatch(): void
+    {
+        Queue::fake();
+
+        $app = ClientApp::factory()->create(['is_active' => true]);
+
+        $dueNotification = AppNotification::factory()->create([
+            'client_app_id' => $app->id,
+            'status' => NotificationStatus::PENDING,
+            'scheduled_at' => now()->subMinute(),
+        ]);
+
+        // التشغيل الأول للأمر المجدول
+        $this->artisan('notifications:dispatch-scheduled')
+            ->assertExitCode(0);
+
+        $this->assertSame(NotificationStatus::PROCESSING, $dueNotification->fresh()?->status);
+        Queue::assertPushed(ProcessAppNotificationJob::class, 1);
+
+        // التشغيل الثاني في الدقيقة التالية لا يجب أن يدفع نفس الإشعار مرة أخرى
+        $this->artisan('notifications:dispatch-scheduled')
+            ->assertExitCode(0);
+
+        Queue::assertPushed(ProcessAppNotificationJob::class, 1);
     }
 }

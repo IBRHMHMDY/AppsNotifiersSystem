@@ -44,6 +44,16 @@ class ClientAppInfolist
                             ->label('حالة التفعيل')
                             ->boolean(),
 
+                        IconEntry::make('is_under_maintenance')
+                            ->label('وضع الصيانة')
+                            ->boolean(),
+
+                        TextEntry::make('maintenance_message')
+                            ->label('رسالة الصيانة')
+                            ->placeholder('لا توجد رسالة صيانة')
+                            ->visible(fn (ClientApp $record): bool => (bool) $record->is_under_maintenance)
+                            ->columnSpanFull(),
+
                         TextEntry::make('created_at')
                             ->label('تاريخ الإنشاء')
                             ->dateTime()

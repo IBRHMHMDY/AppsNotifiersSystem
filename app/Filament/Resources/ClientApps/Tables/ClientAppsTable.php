@@ -61,8 +61,17 @@ class ClientAppsTable
                     ->tooltip('اضغط لنسخ المفتاح الكامل'),
 
                 IconColumn::make('is_active')
-                    ->label('الحالة')
+                    ->label('مفعل')
                     ->boolean()
+                    ->sortable(),
+
+                IconColumn::make('is_under_maintenance')
+                    ->label('صيانة')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-wrench-screwdriver')
+                    ->falseIcon('heroicon-o-check-badge')
+                    ->trueColor('danger')
+                    ->falseColor('success')
                     ->sortable(),
 
                 TextColumn::make('devices_count')
@@ -88,6 +97,10 @@ class ClientAppsTable
             ->filters([
                 TernaryFilter::make('is_active')
                     ->label('حالة التفعيل'),
+
+                TernaryFilter::make('is_under_maintenance')
+                    ->label('وضع الصيانة'),
+
                 TrashedFilter::make(),
             ])
             ->recordActions([

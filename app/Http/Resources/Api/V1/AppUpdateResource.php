@@ -1,5 +1,7 @@
 <?php
 
+// app/Http/Resources/Api/V1/AppUpdateResource.php
+
 declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1;
@@ -36,6 +38,8 @@ class AppUpdateResource extends JsonResource
             'is_blocked_version' => $this->evaluation->isBlockedVersion,
             'force_reason' => $this->evaluation->forceReason,
             'rollout_percentage' => (int) $update->rollout_percentage,
+            'is_under_maintenance' => $this->evaluation->isUnderMaintenance,
+            'maintenance_message' => $this->evaluation->maintenanceMessage,
         ];
     }
 }

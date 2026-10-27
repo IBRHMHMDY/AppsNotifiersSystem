@@ -26,6 +26,8 @@ class ClientApp extends Model
         'firebase_project_id',
         'firebase_credentials',
         'is_active',
+        'is_under_maintenance',
+        'maintenance_message',
     ];
 
     protected $hidden = [
@@ -34,6 +36,7 @@ class ClientApp extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_under_maintenance' => 'boolean',
         'firebase_credentials' => 'encrypted:array',
     ];
 
@@ -41,7 +44,14 @@ class ClientApp extends Model
     {
         return LogOptions::defaults()
             ->useLogName('client_apps')
-            ->logOnly(['name', 'bundle_id', 'firebase_project_id', 'is_active'])
+            ->logOnly([
+                'name',
+                'bundle_id',
+                'firebase_project_id',
+                'is_active',
+                'is_under_maintenance',
+                'maintenance_message',
+            ])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
@@ -68,6 +78,10 @@ class ClientApp extends Model
         $originalAppKey = $this->getOriginal('app_key');
         if (! empty($originalAppKey) && $originalAppKey !== $this->app_key) {
             Cache::forget(self::getCacheKey((string) $originalAppKey));
+        }
+
+        if ($this->id !== null) {
+            AppUpdate::flushCacheForClientApp((int) $this->id);
         }
     }
 

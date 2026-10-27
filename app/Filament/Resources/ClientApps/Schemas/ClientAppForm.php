@@ -11,6 +11,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 
 class ClientAppForm
@@ -44,6 +45,25 @@ class ClientAppForm
                             ->label('مفعل؟')
                             ->default(true),
                     ])->columns(2),
+
+                Section::make('وضع الصيانة المؤقت (Maintenance Mode)')
+                    ->description('عند تفعيل وضع الصيانة، سيستلم تطبيق الموبايل إشارة صيانة مع الرسالة المحددة عند فحص التحديثات.')
+                    ->icon('heroicon-o-wrench-screwdriver')
+                    ->schema([
+                        Toggle::make('is_under_maintenance')
+                            ->label('تفعيل وضع الصيانة لهذا التطبيق')
+                            ->default(false)
+                            ->live(),
+
+                        Textarea::make('maintenance_message')
+                            ->label('رسالة الصيانة للمستخدمين')
+                            ->placeholder('مثال: نقوم حالياً بإجراء تحديثات لتحسين الخدمة، سنعود خلال دقائق...')
+                            ->rows(2)
+                            ->visible(fn (Get $get): bool => (bool) $get('is_under_maintenance'))
+                            ->required(fn (Get $get): bool => (bool) $get('is_under_maintenance'))
+                            ->maxLength(500)
+                            ->columnSpanFull(),
+                    ]),
 
                 Section::make('إعدادات حساب Firebase المخصص (اختياري - Multi-Project FCM)')
                     ->description('اترك هذا الحقل فارغاً لاستخدام مشروع Firebase الافتراضي للسيرفر، أو الصق محتوى ملف Service Account JSON إذا كان هذا التطبيق على مشروع Firebase مستقل.')

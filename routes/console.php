@@ -7,6 +7,7 @@ declare(strict_types=1);
 use App\Actions\Notifications\DispatchNotificationAction;
 use App\Enums\NotificationStatus;
 use App\Models\AppNotification;
+use App\Models\Device;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
@@ -41,3 +42,7 @@ Schedule::command('notifications:dispatch-scheduled')
 
 Schedule::command('activitylog:clean')
     ->daily();
+
+Schedule::command('model:prune', [
+    '--model' => [Device::class],
+])->daily();
