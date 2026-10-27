@@ -11,6 +11,7 @@ use App\Enums\OsType;
 use App\Models\AppNotification;
 use App\Models\ClientApp;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -52,10 +53,10 @@ class DeviceSyncAndTrackingTest extends TestCase
         $app = ClientApp::factory()->create();
         $firstOsCase = OsType::cases()[0]->value;
 
-        $this->mock(PushNotificationServiceInterface::class, function (MockInterface $mock): void {
+        $this->mock(PushNotificationServiceInterface::class, function (MockInterface $mock) use ($app): void {
             $mock->shouldReceive('subscribeToTopics')
                 ->once()
-                ->with(['offers', 'vip'], 'valid_fcm_token_1234567890')
+                ->with(['offers', 'vip'], 'valid_fcm_token_1234567890', Mockery::on(fn ($passedApp) => $passedApp?->id === $app->id))
                 ->andReturnTrue();
         });
 

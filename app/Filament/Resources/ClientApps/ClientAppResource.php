@@ -1,7 +1,12 @@
 <?php
 
+// app/Filament/Resources/ClientApps/ClientAppResource.php
+
+declare(strict_types=1);
+
 namespace App\Filament\Resources\ClientApps;
 
+use App\Filament\RelationManagers\ActivitiesRelationManager;
 use App\Filament\Resources\ClientApps\Pages\CreateClientApp;
 use App\Filament\Resources\ClientApps\Pages\EditClientApp;
 use App\Filament\Resources\ClientApps\Pages\ListClientApps;
@@ -33,6 +38,20 @@ class ClientAppResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'إدارة النظام';
 
+    protected static ?int $navigationSort = 1;
+
+    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->withCount(['devices', 'notifications', 'updates']);
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return (string) ClientApp::query()->where('is_active', true)->count();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return ClientAppForm::configure($schema);
@@ -52,6 +71,7 @@ class ClientAppResource extends Resource
     {
         return [
             DevicesRelationManager::class,
+            ActivitiesRelationManager::class,
         ];
     }
 

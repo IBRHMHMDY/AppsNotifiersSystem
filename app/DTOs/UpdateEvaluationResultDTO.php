@@ -1,5 +1,7 @@
 <?php
 
+// app/DTOs/UpdateEvaluationResultDTO.php
+
 declare(strict_types=1);
 
 namespace App\DTOs;
@@ -16,5 +18,7 @@ readonly class UpdateEvaluationResultDTO
         public bool $isBelowMinimumVersion,
         public bool $isEligibleForRollout,
         public string $forceReason = 'none', // none | manual_flag | blocked_version | below_min_version
+        public bool $isUnderMaintenance = false,
+        public ?string $maintenanceMessage = null,
     ) {}
 }

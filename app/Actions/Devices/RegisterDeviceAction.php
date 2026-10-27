@@ -1,5 +1,7 @@
 <?php
 
+// app/Actions/Devices/RegisterDeviceAction.php
+
 declare(strict_types=1);
 
 namespace App\Actions\Devices;
@@ -18,8 +20,12 @@ class RegisterDeviceAction
 
     public function execute(DeviceRegistrationDTO $dto): Device
     {
-        $clientAppId = $dto->clientAppId
-            ?? ClientApp::query()->where('app_key', $dto->appKey)->value('id');
+        /** @var ClientApp|null $clientApp */
+        $clientApp = $dto->clientAppId !== null
+            ? ClientApp::query()->find($dto->clientAppId)
+            : ClientApp::query()->where('app_key', $dto->appKey)->first();
+
+        $clientAppId = $clientApp?->id ?? $dto->clientAppId;
 
         $existingDevice = Device::query()
             ->where('client_app_id', $clientAppId)
@@ -47,17 +53,17 @@ class RegisterDeviceAction
             );
         });
 
-        // إذا أرسل التطبيق قائمة مواضيع، نقوم بمزامنة الاشتراكات الملغاة والجديدة مع Firebase
+        // إذا أرسل التطبيق قائمة مواضيع، نقوم بمزامنة الاشتراكات الملغاة والجديدة مع مشروع Firebase الخاص بالتطبيق
         if ($dto->topics !== null) {
             $topicsToSubscribe = array_values(array_diff($newTopics, $oldTopics));
             $topicsToUnsubscribe = array_values(array_diff($oldTopics, $newTopics));
 
             if ($topicsToSubscribe !== []) {
-                $this->pushService->subscribeToTopics($topicsToSubscribe, $dto->fcmToken);
+                $this->pushService->subscribeToTopics($topicsToSubscribe, $dto->fcmToken, $clientApp);
             }
 
             if ($topicsToUnsubscribe !== []) {
-                $this->pushService->unsubscribeFromTopics($topicsToUnsubscribe, $dto->fcmToken);
+                $this->pushService->unsubscribeFromTopics($topicsToUnsubscribe, $dto->fcmToken, $clientApp);
             }
         }
 

@@ -1,5 +1,7 @@
 <?php
 
+// app/Filament/Resources/ClientApps/Tables/ClientAppsTable.php
+
 declare(strict_types=1);
 
 namespace App\Filament\Resources\ClientApps\Tables;
@@ -42,6 +44,13 @@ class ClientAppsTable
                     ->copyable()
                     ->fontFamily('mono'),
 
+                TextColumn::make('firebase_project_id')
+                    ->label('مشروع Firebase')
+                    ->placeholder('الافتراضي (Default)')
+                    ->badge()
+                    ->color(fn (?string $state): string => $state ? 'warning' : 'gray')
+                    ->icon('heroicon-o-fire'),
+
                 TextColumn::make('app_key')
                     ->label('App Key')
                     ->copyable()
@@ -52,8 +61,17 @@ class ClientAppsTable
                     ->tooltip('اضغط لنسخ المفتاح الكامل'),
 
                 IconColumn::make('is_active')
-                    ->label('الحالة')
+                    ->label('مفعل')
                     ->boolean()
+                    ->sortable(),
+
+                IconColumn::make('is_under_maintenance')
+                    ->label('صيانة')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-wrench-screwdriver')
+                    ->falseIcon('heroicon-o-check-badge')
+                    ->trueColor('danger')
+                    ->falseColor('success')
                     ->sortable(),
 
                 TextColumn::make('devices_count')
@@ -79,6 +97,10 @@ class ClientAppsTable
             ->filters([
                 TernaryFilter::make('is_active')
                     ->label('حالة التفعيل'),
+
+                TernaryFilter::make('is_under_maintenance')
+                    ->label('وضع الصيانة'),
+
                 TrashedFilter::make(),
             ])
             ->recordActions([

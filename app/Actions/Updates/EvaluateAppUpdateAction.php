@@ -1,5 +1,7 @@
 <?php
 
+// app/Actions/Updates/EvaluateAppUpdateAction.php
+
 declare(strict_types=1);
 
 namespace App\Actions\Updates;
@@ -7,34 +9,45 @@ namespace App\Actions\Updates;
 use App\DTOs\CheckUpdateDTO;
 use App\DTOs\UpdateEvaluationResultDTO;
 use App\Models\AppUpdate;
+use App\Models\ClientApp;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 
 class EvaluateAppUpdateAction
 {
     /**
-     * تقييم حالة التحديث لجهاز العميل مع تطبيق قواعد الحظر والإطلاق التدريجي (Rolling Updates).
+     * تقييم حالة التحديث لجهاز العميل مع تطبيق الكاش وقواعد الحظر والإطلاق التدريجي والصيانة.
      */
     public function execute(CheckUpdateDTO $dto): ?UpdateEvaluationResultDTO
     {
         /** @var AppUpdate|null $latestUpdate */
-        $latestUpdate = AppUpdate::query()
-            ->where('client_app_id', $dto->clientAppId)
-            ->where('is_active', true)
-            ->when(
-                $dto->osType !== null,
-                fn (Builder $q) => $q->where(function (Builder $sub) use ($dto): void {
-                    $sub->where('target_os', $dto->osType->value)
-                        ->orWhereNull('target_os');
-                })
-            )
-            // إعطاء الأولوية للتحديث المخصص لنظام التشغيل ثم الأحدث زمنياً
-            ->orderByRaw('CASE WHEN target_os IS NOT NULL THEN 0 ELSE 1 END')
-            ->latest('created_at')
-            ->first();
+        $latestUpdate = Cache::remember(
+            AppUpdate::getCacheKey($dto->clientAppId, $dto->osType),
+            now()->addHour(),
+            static fn (): ?AppUpdate => AppUpdate::query()
+                ->where('client_app_id', $dto->clientAppId)
+                ->where('is_active', true)
+                ->when(
+                    $dto->osType !== null,
+                    fn (Builder $q) => $q->where(function (Builder $sub) use ($dto): void {
+                        $sub->where('target_os', $dto->osType->value)
+                            ->orWhereNull('target_os');
+                    })
+                )
+                // إعطاء الأولوية للتحديث المخصص لنظام التشغيل ثم الأحدث زمنياً
+                ->orderByRaw('CASE WHEN target_os IS NOT NULL THEN 0 ELSE 1 END')
+                ->latest('created_at')
+                ->first()
+        );
 
         if (! $latestUpdate) {
             return null;
         }
+
+        /** @var ClientApp|null $clientApp */
+        $clientApp = ClientApp::query()->find($dto->clientAppId);
+        $isUnderMaintenance = (bool) ($clientApp?->is_under_maintenance ?? false);
+        $maintenanceMessage = $clientApp?->maintenance_message;
 
         $currentVersion = $dto->currentVersion !== null ? trim($dto->currentVersion) : null;
 
@@ -79,6 +92,8 @@ class EvaluateAppUpdateAction
                 isBelowMinimumVersion: false,
                 isEligibleForRollout: $isEligibleForRollout,
                 forceReason: 'none',
+                isUnderMaintenance: $isUnderMaintenance,
+                maintenanceMessage: $maintenanceMessage,
             );
         }
 
@@ -105,6 +120,8 @@ class EvaluateAppUpdateAction
             isBelowMinimumVersion: $isBelowMinimumVersion,
             isEligibleForRollout: $isEligibleForRollout,
             forceReason: $forceReason,
+            isUnderMaintenance: $isUnderMaintenance,
+            maintenanceMessage: $maintenanceMessage,
         );
     }
 

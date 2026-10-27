@@ -8,10 +8,10 @@ use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
 
-enum OsType: string implements HasLabel, HasColor, HasIcon
+enum OsType: string implements HasColor, HasIcon, HasLabel
 {
-    case Android = 'android';
-    case Ios = 'ios';
+    case ANDROID = 'android';
+    case IOS = 'ios';
 
     /**
      * إرجاع النص المقروء لعرضه في واجهات Filament والمودلز.
@@ -19,19 +19,19 @@ enum OsType: string implements HasLabel, HasColor, HasIcon
     public function getLabel(): ?string
     {
         return match ($this) {
-            self::Android => 'Android',
-            self::Ios => 'iOS',
+            self::ANDROID => 'Android',
+            self::IOS => 'iOS',
         };
     }
 
     /**
      * تحديد اللون المناسب عند عرض الـ Enum كـ Badge في Filament.
      */
-    public function getColor(): string | array | null
+    public function getColor(): string|array|null
     {
         return match ($this) {
-            self::Android => 'success',
-            self::Ios => 'info',
+            self::ANDROID => 'success',
+            self::IOS => 'info',
         };
     }
 
@@ -41,8 +41,8 @@ enum OsType: string implements HasLabel, HasColor, HasIcon
     public function getIcon(): ?string
     {
         return match ($this) {
-            self::Android => 'heroicon-o-device-phone-mobile',
-            self::Ios => 'heroicon-o-device-phone-mobile',
+            self::ANDROID => 'heroicon-o-device-phone-mobile',
+            self::IOS => 'heroicon-o-device-phone-mobile',
         };
     }
 }

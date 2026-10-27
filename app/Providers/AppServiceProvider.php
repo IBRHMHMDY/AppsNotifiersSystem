@@ -1,5 +1,7 @@
 <?php
 
+// app/Providers/AppServiceProvider.php
+
 declare(strict_types=1);
 
 namespace App\Providers;
@@ -10,6 +12,7 @@ use App\Services\FirebasePushService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -36,7 +39,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // تفعيل الوضع الصارم للنماذج في غير بيئة الإنتاج لاكتشاف N+1 والحقول غير المحمية
         Model::shouldBeStrict(! $this->app->environment('production'));
+        DB::prohibitDestructiveCommands($this->app->environment('production'));
+
         $this->configureRateLimiting();
+
         Livewire::setScriptRoute(function ($handle) {
             return Route::get('/vendor/livewire/livewire.min.js', $handle);
         });
@@ -57,6 +63,12 @@ class AppServiceProvider extends ServiceProvider
             $identifier = $request->ip().'|'.$request->header('X-App-Key', 'anonymous');
 
             return Limit::perMinute(60)->by($identifier);
+        });
+
+        RateLimiter::for('notification-track', static function (Request $request): Limit {
+            $identifier = $request->ip().'|'.$request->header('X-App-Key', 'anonymous');
+
+            return Limit::perMinute(120)->by($identifier);
         });
 
         Gate::define('viewPulse', static function (User $user): bool {

@@ -1,19 +1,22 @@
 <?php
 
+// app/Models/AppUpdate.php
+
 declare(strict_types=1);
 
 namespace App\Models;
 
 use App\Enums\OsType;
+use App\Traits\InteractsWithActivityLog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Activitylog\Support\LogOptions;
 
 class AppUpdate extends Model
 {
-    use HasFactory, LogsActivity;
+    use HasFactory, InteractsWithActivityLog;
 
     protected $fillable = [
         'client_app_id',
@@ -43,6 +46,39 @@ class AppUpdate extends Model
             ->logFillable()
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
+    }
+
+    /**
+     * توليد مفتاح الكاش لأحدث إصدار نشط بناءً على التطبيق ونظام التشغيل.
+     */
+    public static function getCacheKey(int $clientAppId, ?OsType $osType = null): string
+    {
+        $osKey = $osType?->value ?? 'any';
+
+        return "app_update:latest:{$clientAppId}:{$osKey}";
+    }
+
+    /**
+     * مسح جميع مفاتيح كاش التحديثات الخاصة بتطبيق معين لجميع الأنظمة.
+     */
+    public static function flushCacheForClientApp(int $clientAppId): void
+    {
+        Cache::forget(self::getCacheKey($clientAppId, null));
+
+        foreach (OsType::cases() as $osCase) {
+            Cache::forget(self::getCacheKey($clientAppId, $osCase));
+        }
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(function (AppUpdate $update): void {
+            self::flushCacheForClientApp((int) $update->client_app_id);
+        });
+
+        static::deleted(function (AppUpdate $update): void {
+            self::flushCacheForClientApp((int) $update->client_app_id);
+        });
     }
 
     public function clientApp(): BelongsTo

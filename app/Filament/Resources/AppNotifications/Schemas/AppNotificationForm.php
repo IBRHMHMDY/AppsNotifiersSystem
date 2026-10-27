@@ -87,8 +87,8 @@ class AppNotificationForm
                                 };
 
                                 return new HtmlString(
-                                    "<div class='rounded-lg border-r-4 p-3 text-sm {$badgeColor}'>" .
-                                    "<strong>{$type->getLabel()}:</strong> {$type->getDescription()}" .
+                                    "<div class='rounded-lg border-r-4 p-3 text-sm {$badgeColor}'>".
+                                    "<strong>{$type->getLabel()}:</strong> {$type->getDescription()}".
                                     '</div>'
                                 );
                             })
@@ -199,7 +199,7 @@ class AppNotificationForm
                                     ->mapWithKeys(function (Device $device): array {
                                         $os = $device->os_type?->getLabel() ?? 'Unknown OS';
                                         $version = $device->app_version ? "v{$device->app_version}" : 'v?';
-                                        $shortToken = substr((string) $device->fcm_token, 0, 12) . '...';
+                                        $shortToken = substr((string) $device->fcm_token, 0, 12).'...';
 
                                         return [$device->id => "جهاز #{$device->id} ({$os} • {$version}) [{$shortToken}]"];
                                     })
@@ -238,9 +238,9 @@ class AppNotificationForm
                                     : 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300';
 
                                 return new HtmlString(
-                                    "<div class='flex items-center justify-between rounded-lg border p-3 {$colorClass}'>" .
-                                    "<div><span class='font-semibold'>الجمهور المطابق حالياً:</span> نحو <strong>{$count}</strong> جهاز مسجل{$extraNote}.</div>" .
-                                    "<span class='text-xs font-medium uppercase px-2 py-1 rounded bg-white/60 dark:bg-black/30'>{$targetType->getLabel()}</span>" .
+                                    "<div class='flex items-center justify-between rounded-lg border p-3 {$colorClass}'>".
+                                    "<div><span class='font-semibold'>الجمهور المطابق حالياً:</span> نحو <strong>{$count}</strong> جهاز مسجل{$extraNote}.</div>".
+                                    "<span class='text-xs font-medium uppercase px-2 py-1 rounded bg-white/60 dark:bg-black/30'>{$targetType->getLabel()}</span>".
                                     '</div>'
                                 );
                             })->columnSpanFull(),

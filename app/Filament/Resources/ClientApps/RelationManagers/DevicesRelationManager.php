@@ -1,10 +1,13 @@
 <?php
 
+// app/Filament/Resources/ClientApps/RelationManagers/DevicesRelationManager.php
+
 declare(strict_types=1);
 
 namespace App\Filament\Resources\ClientApps\RelationManagers;
 
 use App\Enums\OsType;
+use App\Filament\Resources\Devices\Tables\DevicesTable;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -44,6 +47,13 @@ class DevicesRelationManager extends RelationManager
                     ->badge()
                     ->color('info'),
 
+                TextColumn::make('subscribed_topics')
+                    ->label('المواضيع (Topics)')
+                    ->badge()
+                    ->color('warning')
+                    ->formatStateUsing(fn (?string $state): string => $state ? "#{$state}" : '-')
+                    ->placeholder('لا يوجد'),
+
                 TextColumn::make('fcm_token')
                     ->label('FCM Token')
                     ->limit(28)
@@ -70,6 +80,7 @@ class DevicesRelationManager extends RelationManager
                     ->options(OsType::class),
             ])
             ->recordActions([
+                DevicesTable::makeSendTestPushAction(),
                 DeleteAction::make(),
             ])
             ->toolbarActions([

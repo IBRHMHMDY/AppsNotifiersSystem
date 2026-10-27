@@ -1,5 +1,7 @@
 <?php
 
+// app/Models/AppNotification.php
+
 declare(strict_types=1);
 
 namespace App\Models;
@@ -9,10 +11,10 @@ use App\Enums\NotificationStatus;
 use App\Enums\NotificationTargetType;
 use App\Enums\NotificationType;
 use App\Enums\OsType;
+use App\Traits\InteractsWithActivityLog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -20,7 +22,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class AppNotification extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia, LogsActivity;
+    use HasFactory, InteractsWithActivityLog, InteractsWithMedia;
 
     protected $fillable = [
         'client_app_id',
@@ -107,9 +109,17 @@ class AppNotification extends Model implements HasMedia
     public function getTargetSummaryAttribute(): string
     {
         return match ($this->target_type) {
-            NotificationTargetType::AllDevices => $this->clientApp
-                ? "كل أجهزة ({$this->clientApp->name})"
-                : 'كل التطبيقات والأجهزة (بث عام)',
+            NotificationTargetType::AllDevices => (function (): string {
+                if ($this->client_app_id === null) {
+                    return 'كل التطبيقات والأجهزة (بث عام)';
+                }
+
+                $appName = $this->relationLoaded('clientApp')
+                    ? $this->clientApp?->name
+                    : ClientApp::query()->whereKey($this->client_app_id)->value('name');
+
+                return $appName ? "كل أجهزة ({$appName})" : 'كل أجهزة التطبيق المحدد';
+            })(),
 
             NotificationTargetType::Topic => 'الموضوع: #'.($this->topic ?: 'غير محدد'),
 

@@ -1,10 +1,13 @@
 <?php
 
+// app/Contracts/PushNotificationServiceInterface.php
+
 declare(strict_types=1);
 
 namespace App\Contracts;
 
 use App\DTOs\PushDeliveryResultDTO;
+use App\Models\ClientApp;
 
 interface PushNotificationServiceInterface
 {
@@ -18,7 +21,8 @@ interface PushNotificationServiceInterface
         ?string $title,
         ?string $body,
         array $data = [],
-        ?string $imageUrl = null
+        ?string $imageUrl = null,
+        ?ClientApp $clientApp = null
     ): PushDeliveryResultDTO;
 
     /**
@@ -32,7 +36,8 @@ interface PushNotificationServiceInterface
         ?string $title,
         ?string $body,
         array $data = [],
-        ?string $imageUrl = null
+        ?string $imageUrl = null,
+        ?ClientApp $clientApp = null
     ): PushDeliveryResultDTO;
 
     /**
@@ -45,7 +50,8 @@ interface PushNotificationServiceInterface
         ?string $title,
         ?string $body,
         array $data = [],
-        ?string $imageUrl = null
+        ?string $imageUrl = null,
+        ?ClientApp $clientApp = null
     ): PushDeliveryResultDTO;
 
     /**
@@ -54,7 +60,11 @@ interface PushNotificationServiceInterface
      * @param  array<int, string>  $topics
      * @param  array<int, string>|string  $tokens
      */
-    public function subscribeToTopics(array $topics, array|string $tokens): bool;
+    public function subscribeToTopics(
+        array $topics,
+        array|string $tokens,
+        ?ClientApp $clientApp = null
+    ): bool;
 
     /**
      * إلغاء اشتراك أجهزة من مجموعة مواضيع.
@@ -62,5 +72,9 @@ interface PushNotificationServiceInterface
      * @param  array<int, string>  $topics
      * @param  array<int, string>|string  $tokens
      */
-    public function unsubscribeFromTopics(array $topics, array|string $tokens): bool;
+    public function unsubscribeFromTopics(
+        array $topics,
+        array|string $tokens,
+        ?ClientApp $clientApp = null
+    ): bool;
 }
