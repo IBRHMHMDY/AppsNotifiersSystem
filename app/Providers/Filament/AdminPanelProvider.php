@@ -1,5 +1,9 @@
 <?php
 
+// app/Providers/Filament/AdminPanelProvider.php
+
+declare(strict_types=1);
+
 namespace App\Providers\Filament;
 
 use App\Filament\Widgets\DashboardStats;
@@ -27,7 +31,10 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->brandName('Apps Notifiers Center')
             ->login()
+            ->profile()
+            ->sidebarCollapsibleOnDesktop()
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -44,8 +51,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
-                // AccountWidget::class,
-                // FilamentInfoWidget::class,
                 DashboardStats::class,
             ])
             ->middleware([

@@ -1,7 +1,13 @@
 <?php
 
+// app/Filament/Resources/AppNotifications/AppNotificationResource.php
+
+declare(strict_types=1);
+
 namespace App\Filament\Resources\AppNotifications;
 
+use App\Enums\NotificationStatus;
+use App\Filament\RelationManagers\ActivitiesRelationManager;
 use App\Filament\Resources\AppNotifications\Pages\CreateAppNotification;
 use App\Filament\Resources\AppNotifications\Pages\EditAppNotification;
 use App\Filament\Resources\AppNotifications\Pages\ListAppNotifications;
@@ -41,6 +47,20 @@ class AppNotificationResource extends Resource
         return parent::getEloquentQuery()->with(['clientApp']);
     }
 
+    public static function getNavigationBadge(): ?string
+    {
+        $pendingCount = AppNotification::query()
+            ->whereIn('status', [NotificationStatus::PENDING, NotificationStatus::PROCESSING])
+            ->count();
+
+        return $pendingCount > 0 ? (string) $pendingCount : null;
+    }
+
+    public static function getNavigationBadgeColor(): string|array|null
+    {
+        return 'warning';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return AppNotificationForm::configure($schema);
@@ -59,7 +79,7 @@ class AppNotificationResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            ActivitiesRelationManager::class,
         ];
     }
 

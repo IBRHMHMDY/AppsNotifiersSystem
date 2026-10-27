@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\AppUpdates;
 
+use App\Filament\RelationManagers\ActivitiesRelationManager;
 use App\Filament\Resources\AppUpdates\Pages\CreateAppUpdate;
 use App\Filament\Resources\AppUpdates\Pages\EditAppUpdate;
 use App\Filament\Resources\AppUpdates\Pages\ListAppUpdates;
@@ -45,6 +46,16 @@ class AppUpdateResource extends Resource
         return parent::getEloquentQuery()->with(['clientApp']);
     }
 
+    public static function getNavigationBadge(): ?string
+    {
+        return (string) AppUpdate::query()->where('is_active', true)->count();
+    }
+
+    public static function getNavigationBadgeColor(): string|array|null
+    {
+        return 'info';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return AppUpdateForm::configure($schema);
@@ -63,7 +74,7 @@ class AppUpdateResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            ActivitiesRelationManager::class,
         ];
     }
 
