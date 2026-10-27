@@ -9,6 +9,7 @@ use App\Enums\NotificationStatus;
 use App\Models\AppNotification;
 use App\Models\Device;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('notifications:dispatch-scheduled', function (): void {
@@ -35,6 +36,28 @@ Artisan::command('notifications:dispatch-scheduled', function (): void {
 
     $this->info("Dispatched {$count} scheduled notifications.");
 })->purpose('Dispatch due scheduled app notifications');
+
+Artisan::command('logs:clear', function (): void {
+    $logFiles = File::glob(storage_path('logs/*.log'));
+
+    if ($logFiles === []) {
+        $this->info('No log files found to clear.');
+
+        return;
+    }
+
+    foreach ($logFiles as $file) {
+        if (basename($file) === 'laravel.log') {
+            // تفريغ محتوى الملف الرئيسي مع الحفاظ على الملف وصلاحياته (Permissions)
+            File::put($file, '');
+        } else {
+            // حذف ملفات السجلات اليومية المؤرشفة (مثل laravel-2026-10-20.log)
+            File::delete($file);
+        }
+    }
+
+    $this->info('All Laravel log files have been cleared successfully.');
+})->purpose('Clear storage/logs/laravel.log and remove old daily log files');
 
 Schedule::command('notifications:dispatch-scheduled')
     ->everyMinute()
