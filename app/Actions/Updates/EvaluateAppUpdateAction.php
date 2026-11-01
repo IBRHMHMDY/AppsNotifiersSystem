@@ -1,5 +1,4 @@
 <?php
-
 // app/Actions/Updates/EvaluateAppUpdateAction.php
 
 declare(strict_types=1);
@@ -15,9 +14,6 @@ use Illuminate\Support\Facades\Cache;
 
 class EvaluateAppUpdateAction
 {
-    /**
-     * تقييم حالة التحديث لجهاز العميل مع تطبيق الكاش وقواعد الحظر والإطلاق التدريجي والصيانة.
-     */
     public function execute(CheckUpdateDTO $dto): ?UpdateEvaluationResultDTO
     {
         /** @var AppUpdate|null $latestUpdate */
@@ -34,7 +30,6 @@ class EvaluateAppUpdateAction
                             ->orWhereNull('target_os');
                     })
                 )
-                // إعطاء الأولوية للتحديث المخصص لنظام التشغيل ثم الأحدث زمنياً
                 ->orderByRaw('CASE WHEN target_os IS NOT NULL THEN 0 ELSE 1 END')
                 ->latest('created_at')
                 ->first()
@@ -51,12 +46,10 @@ class EvaluateAppUpdateAction
 
         $currentVersion = $dto->currentVersion !== null ? trim($dto->currentVersion) : null;
 
-        // 1. التحقق مما إذا كان هناك إصدار أحدث فعلياً
         $hasNewerVersion = $currentVersion !== null && $currentVersion !== ''
             ? version_compare((string) $latestUpdate->version, $currentVersion, '>')
             : true;
 
-        // 2. التحقق مما إذا كان إصدار المستخدم الحالي ضمن قائمة الإصدارات المحظورة (Blocked Versions)
         $blockedVersions = is_array($latestUpdate->blocked_versions)
             ? array_map('strval', $latestUpdate->blocked_versions)
             : [];
@@ -64,26 +57,23 @@ class EvaluateAppUpdateAction
         $isBlockedVersion = $currentVersion !== null
             && in_array($currentVersion, $blockedVersions, true);
 
-        // 3. التحقق مما إذا كان إصدار المستخدم أقدم من الحد الأدنى المسموح به (min_supported_version)
         $isBelowMinimumVersion = $currentVersion !== null
             && ! empty($latestUpdate->min_supported_version)
             && version_compare($currentVersion, (string) $latestUpdate->min_supported_version, '<');
 
-        // 4. حساب أهلية الجهاز في التحديث التدريجي (Rolling Update) عبر Deterministic Hash (0 - 99)
         $rolloutPercentage = max(0, min(100, (int) ($latestUpdate->rollout_percentage ?? 100)));
-        $deviceId = !empty($dto->deviceIdentifier) ? (string) $dto->deviceIdentifier : (string) (request()->ip() ?? 'unknown-device');
+        
+        // هنا تم الحل: تمرير المتغير حتى لو كان null، والدالة بالأسفل ستعوضه
         $isEligibleForRollout = $this->isDeviceInRolloutBucket(
-            deviceIdentifier: $deviceId,
+            deviceIdentifier: $dto->deviceIdentifier,
             updateId: (int) $latestUpdate->id,
             percentage: $rolloutPercentage
         );
 
-        // ملاحظة أمنية: إذا كان إصدار المستخدم محظوراً لثغرة أمنية أو دون الحد الأدنى، يتجاوز التحديث التدريجي فوراً
         if ($isBlockedVersion || $isBelowMinimumVersion) {
             $isEligibleForRollout = true;
         }
 
-        // إذا لم يكن هناك إصدار أحدث، فلا نُجبر المستخدم على التحديث حتى لو كانت الراية مفعلة
         if (! $hasNewerVersion) {
             return new UpdateEvaluationResultDTO(
                 update: $latestUpdate,
@@ -98,7 +88,6 @@ class EvaluateAppUpdateAction
             );
         }
 
-        // 5. تحديد القرار النهائي لإجبار التحديث (Smart Force Update)
         $shouldForceUpdate = false;
         $forceReason = 'none';
 
@@ -127,9 +116,9 @@ class EvaluateAppUpdateAction
     }
 
     /**
-     * خوارزمية Deterministic Hashing لتوزيع الأجهزة بثبات بين 1% و 100%.
+     * تم تعديل النوع ليقبل ?string لمنع خطأ TypeError
      */
-    private function isDeviceInRolloutBucket(string $deviceIdentifier, int $updateId, int $percentage): bool
+    private function isDeviceInRolloutBucket(?string $deviceIdentifier, int $updateId, int $percentage): bool
     {
         if ($percentage >= 100) {
             return true;
@@ -139,8 +128,10 @@ class EvaluateAppUpdateAction
             return false;
         }
 
-        // توليد رقم ثابت بين 0 و 99 لكل جهاز مع هذا التحديث تحديداً
-        $hashBucket = abs(crc32($deviceIdentifier.':update:'.$updateId)) % 100;
+        // استخدام الـ IP إذا لم يُرسل التطبيق معرّف الجهاز (null)
+        $identifier = !empty($deviceIdentifier) ? $deviceIdentifier : (string) (request()->ip() ?? 'unknown-device');
+        
+        $hashBucket = abs(crc32($identifier.':update:'.$updateId)) % 100;
 
         return $hashBucket < $percentage;
     }
