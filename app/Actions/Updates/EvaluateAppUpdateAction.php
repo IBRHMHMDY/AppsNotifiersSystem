@@ -71,8 +71,9 @@ class EvaluateAppUpdateAction
 
         // 4. حساب أهلية الجهاز في التحديث التدريجي (Rolling Update) عبر Deterministic Hash (0 - 99)
         $rolloutPercentage = max(0, min(100, (int) ($latestUpdate->rollout_percentage ?? 100)));
+        $deviceId = !empty($dto->deviceIdentifier) ? (string) $dto->deviceIdentifier : (string) (request()->ip() ?? 'unknown-device');
         $isEligibleForRollout = $this->isDeviceInRolloutBucket(
-            deviceIdentifier: $dto->deviceIdentifier,
+            deviceIdentifier: $deviceId,
             updateId: (int) $latestUpdate->id,
             percentage: $rolloutPercentage
         );
