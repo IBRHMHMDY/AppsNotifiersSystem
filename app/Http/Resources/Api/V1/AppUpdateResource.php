@@ -1,5 +1,4 @@
 <?php
-
 // app/Http/Resources/Api/V1/AppUpdateResource.php
 
 declare(strict_types=1);
@@ -13,9 +12,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class AppUpdateResource extends JsonResource
 {
     public function __construct(
-        private readonly UpdateEvaluationResultDTO $evaluation
+        // نجعلها تقبل Nullable DTO في حال عدم وجود أي تحديثات في الداتابيز
+        private readonly ?UpdateEvaluationResultDTO $evaluation
     ) {
-        parent::__construct($evaluation->update);
+        // نمرر update إذا كان موجوداً، وإلا نمرر null
+        parent::__construct($evaluation?->update);
     }
 
     /**
@@ -23,6 +24,15 @@ class AppUpdateResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // في حال لم يكن هناك أي تحديثات مسجلة مسبقاً (قاعدة البيانات فارغة)
+        if (! $this->evaluation || ! $this->evaluation->update) {
+            return [
+                'update_available' => false,
+                'is_force_update' => false,
+                'is_under_maintenance' => false,
+            ];
+        }
+
         $update = $this->evaluation->update;
 
         // إذا لم يكن الجهاز ضمن شريحة الإطلاق التدريجي (Rolling Update) ولا توجد حالة طوارئ، نخفي التحديث الجديد عنه حالياً
