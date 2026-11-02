@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('app_updates', function (Blueprint $table) {
-            $table->string('os_type')->after('version');
+            $table->string('os_type')->nullable()->after('version');
         });
     }
 
