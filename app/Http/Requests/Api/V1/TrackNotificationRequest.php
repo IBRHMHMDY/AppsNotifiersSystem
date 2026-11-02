@@ -27,7 +27,7 @@ class TrackNotificationRequest extends FormRequest
             // تعديل النوع إلى string والبحث في حقل remote_id بدلاً من id المحلي
             'notification_id' => ['required', 'string', 'exists:app_notifications,remote_id'],
             'event' => ['required', Rule::enum(NotificationEvent::class)],
-            'fcm_token' => ['nullable', 'string', 'min:10', 'max:512'],
+            'device_id' => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -46,7 +46,7 @@ class TrackNotificationRequest extends FormRequest
             // تمرير المعرف النصي إلى DTO
             notificationId: $validated['notification_id'], 
             event: NotificationEvent::from($validated['event']),
-            fcmToken: $validated['fcm_token'] ?? null,
+            deviceId: $validated['device_id'],
         );
     }
 }

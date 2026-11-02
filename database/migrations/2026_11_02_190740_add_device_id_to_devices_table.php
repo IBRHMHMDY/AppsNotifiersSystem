@@ -13,7 +13,9 @@ return new class extends Migration
     {
         Schema::table('devices', function (Blueprint $table) {
             // إضافة الحقل كـ String ليحفظ الـ UUID مع وضع Unique Index لضمان عدم التكرار
-            $table->string('device_id')->after('client_app_id')->unique();
+            $table->string('device_id')->nullable()->after('client_app_id')->unique();
+
+            $table->index(['client_app_id','device_id']);
         });
     }
 

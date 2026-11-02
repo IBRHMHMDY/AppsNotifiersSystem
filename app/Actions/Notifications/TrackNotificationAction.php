@@ -1,4 +1,5 @@
 <?php
+// app/Actions/Notifications/TrackNotificationAction.php
 
 declare(strict_types=1);
 
@@ -31,13 +32,13 @@ class TrackNotificationAction
             return false;
         }
 
-        // منع تكرار احتساب نفس الحدث لنفس الجهاز (Idempotency) في حال توفر fcm_token
-        if ($dto->fcmToken !== null && $dto->fcmToken !== '') {
+        // منع تكرار احتساب نفس الحدث لنفس الجهاز (Idempotency) باستخدام device_id
+        if ($dto->deviceId !== '') {
             $deduplicationKey = sprintf(
                 'notif_track:%d:%s:%s',
                 $notification->id,
                 $dto->event->value,
-                hash('sha256', $dto->fcmToken)
+                hash('sha256', $dto->deviceId)
             );
 
             // إذا تم تسجيل هذا الحدث مسبقاً لهذا الجهاز خلال 7 أيام، نتجاهل الزيادة المكررة
@@ -45,10 +46,10 @@ class TrackNotificationAction
                 return true;
             }
 
-            // تحديث وقت آخر نشاط للجهاز
+            // تحديث وقت آخر نشاط للجهاز باستخدام device_id
             Device::query()
                 ->where('client_app_id', $dto->clientAppId)
-                ->where('fcm_token', $dto->fcmToken)
+                ->where('device_id', $dto->deviceId)
                 ->update(['last_active_at' => now()]);
         }
 
@@ -60,6 +61,16 @@ class TrackNotificationAction
         }
 
         $notification->increment($dto->event->counterColumn(), 1, $extraUpdates);
+
+        // تسجيل النشاط في Activity Log
+        $device = Device::query()->where('device_id', $dto->deviceId)->first();
+        if ($device) {
+             activity()
+                ->performedOn($notification)
+                ->causedBy($device)
+                ->event($dto->event->value)
+                ->log("Device {$device->device_id} {$dto->event->value} notification");
+        }
 
         return true;
     }

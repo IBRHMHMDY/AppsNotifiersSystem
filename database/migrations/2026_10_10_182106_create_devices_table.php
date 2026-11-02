@@ -19,6 +19,8 @@ return new class extends Migration
             $table->string('app_version')->index(); // للتحقق مما إذا كان الجهاز يحتاج لتحديث
             $table->timestamp('last_active_at')->nullable()->index(); // لمعرفة الأجهزة النشطة مؤخراً
             $table->timestamps();
+
+            
         });
     }
 

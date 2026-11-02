@@ -12,6 +12,6 @@ readonly class TrackNotificationDTO
         public int $clientAppId,
         public String $notificationId,
         public NotificationEvent $event,
-        public ?string $fcmToken = null,
+        public string $deviceId,
     ) {}
 }
