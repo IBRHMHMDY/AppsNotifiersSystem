@@ -32,7 +32,7 @@ class VerifyAppKey
                 ->where('is_active', true)
                 ->first();
                 
-            return $app ? clone $app->toArray() : null; // إرجاع مصفوفة بسيطة يسهل تشفيرها
+            return $app->toArray(); // إرجاع مصفوفة بسيطة يسهل تشفيرها
         });
 
         if (! $clientApp) {
