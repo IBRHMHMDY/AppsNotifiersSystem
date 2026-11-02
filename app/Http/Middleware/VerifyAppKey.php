@@ -30,7 +30,7 @@ class VerifyAppKey
             throw new InvalidAppKeyException('Invalid or inactive App Key.');
         }
 
-        $request->attributes->set('client_app', $clientApp);
+        $request->merge(['client_app_id' => $clientApp->id]);
 
         return $next($request);
     }

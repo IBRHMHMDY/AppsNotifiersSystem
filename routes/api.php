@@ -23,9 +23,10 @@ Route::prefix('v1')
     ->group(function (): void {
 
         // 1. نقطة التحقق من التحديثات (مستثناة من الحماية الصارمة لضمان وصول التحديث الإجباري)
-        Route::get('/updates/check', CheckUpdateController::class)
-            ->middleware([AllowExpiredAppKey::class, ThrottleRequests::using('update-check')])
-            ->name('updates.check');
+        Route::middleware([AllowExpiredAppKey::class, ThrottleRequests::using('update-check')])->group(function () {
+             Route::get('/updates/check', CheckUpdateController::class)
+             ->name('updates.check');
+        });
 
         // 2. المسارات المحمية بالمفتاح الصارم (يُرفض الطلب 401 إذا تغير المفتاح)
         Route::middleware([VerifyAppKey::class])->group(function (): void {

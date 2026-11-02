@@ -20,6 +20,7 @@ class CheckUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'client_app_id' => ['required', 'integer'],
             'app_version' => ['required', 'string', 'max:50'],
             'os_type' => ['required', Rule::enum(OsType::class)],
             'device_id' => ['required', 'string', 'max:255'],
@@ -29,7 +30,7 @@ class CheckUpdateRequest extends FormRequest
     public function toDto(): CheckUpdateDTO
     {
         return new CheckUpdateDTO(
-            clientAppId: $this->attributes->get('client_app')->id,
+            clientAppId: (int) $this->validated('client_app_id'),
             appVersion: $this->validated('app_version'),
             osType: OsType::from($this->validated('os_type')),
             deviceId: $this->validated('device_id'),

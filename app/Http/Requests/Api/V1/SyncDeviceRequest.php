@@ -20,6 +20,7 @@ class SyncDeviceRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'client_app_id' => ['required', 'integer'],
             'fcm_token' => ['required', 'string'],
             'os_type' => ['required', Rule::enum(OsType::class)],
             'app_version' => ['required', 'string', 'max:50'],
@@ -31,7 +32,7 @@ class SyncDeviceRequest extends FormRequest
     public function toDto(): DeviceRegistrationDTO
     {
         return new DeviceRegistrationDTO(
-            clientAppId: $this->attributes->get('client_app')->id,
+            clientAppId: (int) $this->validated('client_app_id'),
             fcmToken: $this->validated('fcm_token'),
             osType: OsType::from($this->validated('os_type')),
             appVersion: $this->validated('app_version'),
