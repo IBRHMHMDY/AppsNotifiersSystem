@@ -10,7 +10,7 @@ readonly class TrackNotificationDTO
 {
     public function __construct(
         public int $clientAppId,
-        public int $notificationId,
+        public String $notificationId,
         public NotificationEvent $event,
         public ?string $fcmToken = null,
     ) {}

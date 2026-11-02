@@ -14,7 +14,7 @@ class SyncDeviceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->attributes->get('clientApp') instanceof ClientApp;
+        return $this->has('client_app_id');
     }
 
     /**

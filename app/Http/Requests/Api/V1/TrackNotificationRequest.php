@@ -1,4 +1,5 @@
 <?php
+// app/Http/Requests/Api/V1/TrackNotificationRequest.php
 
 declare(strict_types=1);
 
@@ -14,7 +15,7 @@ class TrackNotificationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->attributes->get('clientApp') instanceof ClientApp;
+        return $this->has('client_app_id');
     }
 
     /**
@@ -23,7 +24,8 @@ class TrackNotificationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'notification_id' => ['required', 'integer', 'exists:app_notifications,id'],
+            // تعديل النوع إلى string والبحث في حقل remote_id بدلاً من id المحلي
+            'notification_id' => ['required', 'string', 'exists:app_notifications,remote_id'],
             'event' => ['required', Rule::enum(NotificationEvent::class)],
             'fcm_token' => ['nullable', 'string', 'min:10', 'max:512'],
         ];
@@ -31,20 +33,18 @@ class TrackNotificationRequest extends FormRequest
 
     public function clientApp(): ClientApp
     {
-        /** @var ClientApp $clientApp */
-        $clientApp = $this->attributes->get('clientApp');
-
-        return $clientApp;
+        return ClientApp::findOrFail($this->input('client_app_id'));
     }
 
     public function toDto(): TrackNotificationDTO
     {
-        /** @var array{notification_id: int|string, event: string, fcm_token?: string|null} $validated */
+        /** @var array{notification_id: string, event: string, fcm_token?: string|null} $validated */
         $validated = $this->validated();
 
         return new TrackNotificationDTO(
             clientAppId: (int) $this->clientApp()->id,
-            notificationId: (int) $validated['notification_id'],
+            // تمرير المعرف النصي إلى DTO
+            notificationId: $validated['notification_id'], 
             event: NotificationEvent::from($validated['event']),
             fcmToken: $validated['fcm_token'] ?? null,
         );
