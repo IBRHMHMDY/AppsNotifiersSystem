@@ -20,6 +20,7 @@ class Device extends Model
 
     protected $fillable = [
         'client_app_id',
+        'device_id',
         'fcm_token',
         'os_type',
         'app_version',

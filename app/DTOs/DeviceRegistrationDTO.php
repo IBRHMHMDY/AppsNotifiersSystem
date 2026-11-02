@@ -1,4 +1,5 @@
 <?php
+// app/DTOs/DeviceRegistrationDTO.php
 
 declare(strict_types=1);
 
@@ -6,17 +7,14 @@ namespace App\DTOs;
 
 use App\Enums\OsType;
 
-readonly class DeviceRegistrationDTO
+final readonly class DeviceRegistrationDTO
 {
-    /**
-     * @param  array<int, string>|null  $topics
-     */
     public function __construct(
-        public string $appKey,
+        public int $clientAppId,
         public string $fcmToken,
         public OsType $osType,
         public string $appVersion,
-        public ?int $clientAppId = null,
-        public ?array $topics = null,
+        public string $deviceId,
+        public ?string $deviceModel = null,
     ) {}
 }

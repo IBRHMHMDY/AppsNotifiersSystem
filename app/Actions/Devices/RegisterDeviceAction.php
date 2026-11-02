@@ -1,72 +1,29 @@
 <?php
-
 // app/Actions/Devices/RegisterDeviceAction.php
 
 declare(strict_types=1);
 
 namespace App\Actions\Devices;
 
-use App\Contracts\PushNotificationServiceInterface;
 use App\DTOs\DeviceRegistrationDTO;
-use App\Models\ClientApp;
 use App\Models\Device;
-use Illuminate\Support\Facades\DB;
 
-class RegisterDeviceAction
+final readonly class RegisterDeviceAction
 {
-    public function __construct(
-        private readonly PushNotificationServiceInterface $pushService
-    ) {}
-
     public function execute(DeviceRegistrationDTO $dto): Device
     {
-        /** @var ClientApp|null $clientApp */
-        $clientApp = $dto->clientAppId !== null
-            ? ClientApp::query()->find($dto->clientAppId)
-            : ClientApp::query()->where('app_key', $dto->appKey)->first();
-
-        $clientAppId = $clientApp?->id ?? $dto->clientAppId;
-
-        $existingDevice = Device::query()
-            ->where('client_app_id', $clientAppId)
-            ->where('fcm_token', $dto->fcmToken)
-            ->first();
-
-        $oldTopics = is_array($existingDevice?->subscribed_topics)
-            ? $existingDevice->subscribed_topics
-            : [];
-
-        $newTopics = $dto->topics !== null ? $dto->topics : $oldTopics;
-
-        $device = DB::transaction(function () use ($clientAppId, $dto, $newTopics): Device {
-            return Device::query()->updateOrCreate(
-                [
-                    'client_app_id' => $clientAppId,
-                    'fcm_token' => $dto->fcmToken,
-                ],
-                [
-                    'os_type' => $dto->osType,
-                    'app_version' => $dto->appVersion,
-                    'subscribed_topics' => $newTopics,
-                    'last_active_at' => now(),
-                ]
-            );
-        });
-
-        // إذا أرسل التطبيق قائمة مواضيع، نقوم بمزامنة الاشتراكات الملغاة والجديدة مع مشروع Firebase الخاص بالتطبيق
-        if ($dto->topics !== null) {
-            $topicsToSubscribe = array_values(array_diff($newTopics, $oldTopics));
-            $topicsToUnsubscribe = array_values(array_diff($oldTopics, $newTopics));
-
-            if ($topicsToSubscribe !== []) {
-                $this->pushService->subscribeToTopics($topicsToSubscribe, $dto->fcmToken, $clientApp);
-            }
-
-            if ($topicsToUnsubscribe !== []) {
-                $this->pushService->unsubscribeFromTopics($topicsToUnsubscribe, $dto->fcmToken, $clientApp);
-            }
-        }
-
-        return $device;
+        return Device::updateOrCreate(
+            [
+                'client_app_id' => $dto->clientAppId,
+                'device_id' => $dto->deviceId, // أصبح يعتمد على device_id وليس التوكن
+            ],
+            [
+                'fcm_token' => $dto->fcmToken,
+                'os_type' => $dto->osType,
+                'app_version' => $dto->appVersion,
+                'device_model' => $dto->deviceModel,
+                'last_active_at' => now(),
+            ]
+        );
     }
 }

@@ -1,4 +1,5 @@
 <?php
+// app/Http/Requests/Api/V1/CheckUpdateRequest.php
 
 declare(strict_types=1);
 
@@ -6,7 +7,6 @@ namespace App\Http\Requests\Api\V1;
 
 use App\DTOs\CheckUpdateDTO;
 use App\Enums\OsType;
-use App\Models\ClientApp;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -14,46 +14,25 @@ class CheckUpdateRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->attributes->get('clientApp') instanceof ClientApp;
+        return true;
     }
 
-    /**
-     * @return array<string, array<int, mixed>>
-     */
     public function rules(): array
     {
         return [
-            'current_version' => ['nullable', 'string', 'max:50'],
-            'os_type' => ['nullable', Rule::enum(OsType::class)],
-            'device_id' => ['nullable', 'string', 'max:255'],
+            'app_version' => ['required', 'string', 'max:50'],
+            'os_type' => ['required', Rule::enum(OsType::class)],
+            'device_id' => ['required', 'string', 'max:255'],
         ];
-    }
-
-    public function clientApp(): ClientApp
-    {
-        /** @var ClientApp $clientApp */
-        $clientApp = $this->attributes->get('clientApp');
-
-        return $clientApp;
     }
 
     public function toDto(): CheckUpdateDTO
     {
-        /** @var array{current_version?: string|null, os_type?: string|null, device_id?: string|null} $validated */
-        $validated = $this->validated();
-
-        $deviceIdentifier = (string) (
-            $validated['device_id']
-            ?? $this->header('X-Device-Id')
-            ?? $this->ip()
-            ?? 'default-device'
-        );
-
         return new CheckUpdateDTO(
-            clientAppId: (int) $this->clientApp()->id,
-            deviceIdentifier: $deviceIdentifier,
-            currentVersion: $validated['current_version'] ?? null,
-            osType: isset($validated['os_type']) ? OsType::from($validated['os_type']) : null,
+            clientAppId: $this->attributes->get('client_app')->id,
+            appVersion: $this->validated('app_version'),
+            osType: OsType::from($this->validated('os_type')),
+            deviceId: $this->validated('device_id'),
         );
     }
 }

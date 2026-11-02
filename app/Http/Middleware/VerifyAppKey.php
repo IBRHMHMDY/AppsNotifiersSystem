@@ -8,42 +8,29 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use App\Models\ClientApp;
-use Illuminate\Support\Facades\Cache;
+use App\Exceptions\InvalidAppKeyException;
 use Symfony\Component\HttpFoundation\Response;
 
 class VerifyAppKey
 {
+    /**
+     * @throws InvalidAppKeyException
+     */
     public function handle(Request $request, Closure $next): Response
     {
-        // استخراج المفتاح حسب طريقتك (Header أو غيره)
-        $appKey = $request->header('X-App-Key') ?? $request->bearerToken();
+        $appKey = $request->header('X-App-Key');
 
         if (! $appKey) {
-            return response()->json([
-                'success' => false,
-                'message' => 'App Key is missing.'
-            ], 401);
+            throw new InvalidAppKeyException('App Key is missing in the request headers.');
         }
 
-        // الحل الجذري: تخزين مصفوفة (Array) بدلاً من الكائن (Model)
-        $clientApp = Cache::remember("client_app_{$appKey}", now()->addHours(24), function () use ($appKey) {
-            $app = ClientApp::query()
-                ->where('app_key', $appKey)
-                ->where('is_active', true)
-                ->first();
-                
-            return $app->toArray(); // إرجاع مصفوفة بسيطة يسهل تشفيرها
-        });
+        $clientApp = ClientApp::where('app_key', $appKey)->where('is_active', true)->first();
 
         if (! $clientApp) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or inactive App Key.'
-            ], 401);
+            throw new InvalidAppKeyException('Invalid or inactive App Key.');
         }
 
-        // دمج الـ ID في الطلب لاستخدامه في Controllers لاحقاً
-        $request->merge(['client_app_id' => $clientApp['id']]);
+        $request->attributes->set('client_app', $clientApp);
 
         return $next($request);
     }

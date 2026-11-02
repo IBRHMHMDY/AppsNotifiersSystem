@@ -7,132 +7,72 @@ namespace App\Actions\Updates;
 
 use App\DTOs\CheckUpdateDTO;
 use App\DTOs\UpdateEvaluationResultDTO;
-use App\Models\AppUpdate;
 use App\Models\ClientApp;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Cache;
+use App\Models\Device;
+use Composer\Semver\Comparator;
 
-class EvaluateAppUpdateAction
+final readonly class EvaluateAppUpdateAction
 {
     public function execute(CheckUpdateDTO $dto): ?UpdateEvaluationResultDTO
     {
-        /** @var AppUpdate|null $latestUpdate */
-        $latestUpdate = Cache::remember(
-            AppUpdate::getCacheKey($dto->clientAppId, $dto->osType),
-            now()->addHour(),
-            static fn (): ?AppUpdate => AppUpdate::query()
-                ->where('client_app_id', $dto->clientAppId)
-                ->where('is_active', true)
-                ->when(
-                    $dto->osType !== null,
-                    fn (Builder $q) => $q->where(function (Builder $sub) use ($dto): void {
-                        $sub->where('target_os', $dto->osType->value)
-                            ->orWhereNull('target_os');
-                    })
-                )
-                ->orderByRaw('CASE WHEN target_os IS NOT NULL THEN 0 ELSE 1 END')
-                ->latest('created_at')
-                ->first()
-        );
-
-        if (! $latestUpdate) {
+        $app = ClientApp::find($dto->clientAppId);
+        if (!$app) {
             return null;
         }
 
-        /** @var ClientApp|null $clientApp */
-        $clientApp = ClientApp::query()->find($dto->clientAppId);
-        $isUnderMaintenance = (bool) ($clientApp?->is_under_maintenance ?? false);
-        $maintenanceMessage = $clientApp?->maintenance_message;
+        // تحديث آخر ظهور للجهاز لضمان تتبع النشاط بدقة
+        $device = Device::where('client_app_id', $app->id)
+            ->where('device_id', $dto->deviceId)
+            ->first();
+            
+        if ($device) {
+            $device->update(['last_active_at' => now()]);
+        }
 
-        $currentVersion = $dto->currentVersion !== null ? trim($dto->currentVersion) : null;
+        $activeUpdate = $app->updates()
+            ->where('os_type', $dto->osType->value)
+            ->where('is_active', true)
+            ->latest()
+            ->first();
 
-        $hasNewerVersion = $currentVersion !== null && $currentVersion !== ''
-            ? version_compare((string) $latestUpdate->version, $currentVersion, '>')
-            : true;
+        if (! $activeUpdate) {
+            return null;
+        }
 
-        $blockedVersions = is_array($latestUpdate->blocked_versions)
-            ? array_map('strval', $latestUpdate->blocked_versions)
-            : [];
-
-        $isBlockedVersion = $currentVersion !== null
-            && in_array($currentVersion, $blockedVersions, true);
-
-        $isBelowMinimumVersion = $currentVersion !== null
-            && ! empty($latestUpdate->min_supported_version)
-            && version_compare($currentVersion, (string) $latestUpdate->min_supported_version, '<');
-
-        $rolloutPercentage = max(0, min(100, (int) ($latestUpdate->rollout_percentage ?? 100)));
+        $hasNewerVersion = Comparator::greaterThan($activeUpdate->version, $dto->appVersion);
         
-        // هنا تم الحل: تمرير المتغير حتى لو كان null، والدالة بالأسفل ستعوضه
-        $isEligibleForRollout = $this->isDeviceInRolloutBucket(
-            deviceIdentifier: $dto->deviceIdentifier,
-            updateId: (int) $latestUpdate->id,
-            percentage: $rolloutPercentage
-        );
-
-        if ($isBlockedVersion || $isBelowMinimumVersion) {
-            $isEligibleForRollout = true;
-        }
-
         if (! $hasNewerVersion) {
-            return new UpdateEvaluationResultDTO(
-                update: $latestUpdate,
-                hasNewerVersion: false,
-                shouldForceUpdate: false,
-                isBlockedVersion: false,
-                isBelowMinimumVersion: false,
-                isEligibleForRollout: $isEligibleForRollout,
-                forceReason: 'none',
-                isUnderMaintenance: $isUnderMaintenance,
-                maintenanceMessage: $maintenanceMessage,
-            );
+            return null;
         }
 
-        $shouldForceUpdate = false;
-        $forceReason = 'none';
+        $isForceUpdate = (bool) $activeUpdate->is_force_update;
+        $isEligibleForRollout = true;
 
-        if ($isBlockedVersion) {
-            $shouldForceUpdate = true;
-            $forceReason = 'blocked_version';
-        } elseif ($isBelowMinimumVersion) {
-            $shouldForceUpdate = true;
-            $forceReason = 'below_min_version';
-        } elseif ($latestUpdate->is_force_update && $isEligibleForRollout) {
-            $shouldForceUpdate = true;
-            $forceReason = 'manual_flag';
+        // التحقق من استهداف جهاز معين (Smart Update) باستخدام device_id
+        if (! $isForceUpdate && $activeUpdate->target_devices && $device) {
+            $targetedDeviceIds = is_array($activeUpdate->target_devices) 
+                ? $activeUpdate->target_devices 
+                : json_decode($activeUpdate->target_devices, true) ?? [];
+                
+            if (! in_array($device->device_id, $targetedDeviceIds)) {
+                $isEligibleForRollout = false;
+            }
+        }
+
+        if (! $isEligibleForRollout) {
+            return null;
         }
 
         return new UpdateEvaluationResultDTO(
-            update: $latestUpdate,
+            update: $activeUpdate,
             hasNewerVersion: $hasNewerVersion,
-            shouldForceUpdate: $shouldForceUpdate,
-            isBlockedVersion: $isBlockedVersion,
-            isBelowMinimumVersion: $isBelowMinimumVersion,
+            shouldForceUpdate: $isForceUpdate,
+            isBlockedVersion: false,
+            isBelowMinimumVersion: false,
             isEligibleForRollout: $isEligibleForRollout,
-            forceReason: $forceReason,
-            isUnderMaintenance: $isUnderMaintenance,
-            maintenanceMessage: $maintenanceMessage,
+            forceReason: $isForceUpdate ? 'manual_flag' : 'none',
+            isUnderMaintenance: false,
+            maintenanceMessage: null,
         );
-    }
-
-    /**
-     * تم تعديل النوع ليقبل ?string لمنع خطأ TypeError
-     */
-    private function isDeviceInRolloutBucket(?string $deviceIdentifier, int $updateId, int $percentage): bool
-    {
-        if ($percentage >= 100) {
-            return true;
-        }
-
-        if ($percentage <= 0) {
-            return false;
-        }
-
-        // استخدام الـ IP إذا لم يُرسل التطبيق معرّف الجهاز (null)
-        $identifier = !empty($deviceIdentifier) ? $deviceIdentifier : (string) (request()->ip() ?? 'unknown-device');
-        
-        $hashBucket = abs(crc32($identifier.':update:'.$updateId)) % 100;
-
-        return $hashBucket < $percentage;
     }
 }

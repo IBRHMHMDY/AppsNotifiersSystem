@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/Api/V1/CheckUpdateController.php
 
 declare(strict_types=1);
 
@@ -18,18 +19,12 @@ class CheckUpdateController extends Controller
 
     public function __invoke(CheckUpdateRequest $request): JsonResponse
     {
-        $evaluation = $this->evaluateAppUpdateAction->execute($request->toDto());
-
-        if (! $evaluation) {
-            return $this->successResponse(
-                data: null,
-                message: 'No updates available.'
-            );
-        }
+        // تم الاعتماد على toDto() لتوحيد النمط مع SyncDeviceController
+        $evaluationResult = $this->evaluateAppUpdateAction->execute($request->toDto());
 
         return $this->successResponse(
-            data: new AppUpdateResource($evaluation),
-            message: 'Latest update fetched successfully.'
+            data: $evaluationResult ? new AppUpdateResource($evaluationResult) : null,
+            message: 'Update check completed.'
         );
     }
 }
