@@ -30,7 +30,7 @@ final readonly class EvaluateAppUpdateAction
         }
 
         $activeUpdate = $app->updates()
-            ->where('os_type', $dto->osType->value)
+            ->where('target_os', $dto->osType->value)
             ->where('is_active', true)
             ->latest()
             ->first();
