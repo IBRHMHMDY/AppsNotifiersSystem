@@ -25,7 +25,7 @@ class TrackNotificationRequest extends FormRequest
     {
         return [
             // تعديل النوع إلى string والبحث في حقل remote_id بدلاً من id المحلي
-            'notification_id' => ['required', 'string', 'exists:app_notifications,remote_id'],
+            'notification_id' => ['required', 'string', 'exists:app_notifications,id'],
             'event' => ['required', Rule::enum(NotificationEvent::class)],
             'device_id' => ['required', 'string', 'max:255'],
         ];
